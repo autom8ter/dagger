@@ -14,7 +14,6 @@ func NodeTypes() []string {
 	return globalGraph.NodeTypes()
 }
 
-
 func GetNode(id primitive.TypedID) (*Node, bool) {
 	n, ok := globalGraph.GetNode(id)
 	if !ok {
@@ -42,6 +41,7 @@ func RangeEdges(fn func(e *primitive.Edge) bool) {
 func RangeEdgeTypes(edgeType primitive.Type, fn func(e *primitive.Edge) bool) {
 	globalGraph.RangeEdgeTypes(edgeType, fn)
 }
+
 //
 //func HasNode(id primitive.TypedID) bool {
 //	return globalGraph.HasNode(id)

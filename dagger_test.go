@@ -8,25 +8,27 @@ import (
 	"time"
 )
 
+var (
+	coleman = dagger.NewNode("user", fmt.Sprintf("cword_%v", time.Now().UnixNano()), map[string]interface{}{
+		"name": "coleman",
+	})
+	tyler = dagger.NewNode("user", fmt.Sprintf("twash_%v", time.Now().UnixNano()), map[string]interface{}{
+		"name": "tyler",
+	})
+	sarah = dagger.NewNode("user", fmt.Sprintf("swash_%v", time.Now().UnixNano()), map[string]interface{}{
+		"name": "sarah",
+	})
+	lacee = dagger.NewNode("user", fmt.Sprintf("ljans_%v", time.Now().UnixNano()), map[string]interface{}{
+		"name": "lacee",
+	})
+	charlie = dagger.NewNode("dog", "", map[string]interface{}{
+		"name":   "charlie",
+		"weight": 25,
+	})
+)
+
 func seedT(t *testing.T) {
-	var (
-		coleman = dagger.NewNode("user", fmt.Sprintf("cword_%v", time.Now().UnixNano()), map[string]interface{}{
-			"name": "coleman",
-		})
-		tyler   = dagger.NewNode("user", fmt.Sprintf("twash_%v", time.Now().UnixNano()), map[string]interface{}{
-			"name": "tyler",
-		})
-		sarah   = dagger.NewNode("user", fmt.Sprintf("swash_%v", time.Now().UnixNano()), map[string]interface{}{
-			"name": "sarah",
-		})
-		lacee   = dagger.NewNode("user", fmt.Sprintf("ljans_%v", time.Now().UnixNano()), map[string]interface{}{
-			"name": "lacee",
-		})
-		charlie   = dagger.NewNode("dog", "", map[string]interface{}{
-			"name": "charlie",
-			"weight": 25,
-		})
-	)
+
 	if err := coleman.Connect(tyler, "friend"); err != nil {
 		t.Fatal(err)
 	}
@@ -66,24 +68,7 @@ func seedT(t *testing.T) {
 }
 
 func seedB(t *testing.B) {
-	var (
-		coleman = dagger.NewNode("user", "cword", map[string]interface{}{
-			"name": "coleman",
-		})
-		tyler   = dagger.NewNode("user", "twash", map[string]interface{}{
-			"name": "tyler",
-		})
-		sarah   = dagger.NewNode("user", "swash", map[string]interface{}{
-			"name": "sarah",
-		})
-		lacee   = dagger.NewNode("user", "ljans", map[string]interface{}{
-			"name": "lacee",
-		})
-		charlie   = dagger.NewNode("dog", "", map[string]interface{}{
-			"name": "charlie",
-			"weight": 25,
-		})
-	)
+
 	if err := coleman.Connect(tyler, "friend"); err != nil {
 		t.Fatal(err)
 	}
@@ -131,13 +116,13 @@ func Test(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Log(string(bits) )
+		t.Log(string(bits))
 		n.EdgesFrom(func(e *primitive.Edge) bool {
 			bits, err := e.JSON()
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Log(string(bits) )
+			t.Log(string(bits))
 			return true
 		})
 		n.EdgesTo(func(e *primitive.Edge) bool {
@@ -163,20 +148,22 @@ func Benchmark(t *testing.B) {
 		seedB(t)
 		dagger.RangeNodes(func(n *dagger.Node) bool {
 			nodes++
+			t.Logf("nodes(%v)", nodes)
 			n.EdgesFrom(func(e *primitive.Edge) bool {
 				edgesFrom++
-				t.Logf("here")
+				t.Logf("edgesFrom(%v)", edgesFrom)
 				return true
 			})
 			n.EdgesTo(func(e *primitive.Edge) bool {
 				edgesTo++
+				t.Logf("edgesTo(%v)", edgesTo)
 				return true
 			})
 			return true
 		})
+
 	}
 	t.Logf("visited: %v nodes", nodes)
 	t.Logf("visited: %v edgesFrom", edgesFrom)
 	t.Logf("visited: %v edgesTo", edgesTo)
 }
-

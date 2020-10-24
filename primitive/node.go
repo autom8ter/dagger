@@ -18,12 +18,12 @@ type Node map[string]interface{}
 func NewNode(nodeType, id string) Node {
 	if id == "" {
 		return map[string]interface{}{
-			ID_KEY: uuid(),
+			ID_KEY:   uuid(),
 			TYPE_KEY: nodeType,
 		}
 	}
 	return map[string]interface{}{
-		ID_KEY: id,
+		ID_KEY:   id,
 		TYPE_KEY: nodeType,
 	}
 }

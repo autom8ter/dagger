@@ -51,7 +51,7 @@ func (n *Node) Patch(data map[string]interface{}) {
 	globalGraph.AddNode(node)
 }
 
-func (n *Node) Range(fn func(key string, value interface{}) bool ) {
+func (n *Node) Range(fn func(key string, value interface{}) bool) {
 	node := n.load()
 	node.Range(fn)
 }
