@@ -4,13 +4,25 @@ dagger is a blazing fast, concurrency safe, mutable, in-memory directed graph im
     
     import "github.com/autom8ter/dagger"
 
-Design:
+## Design:
+
 - flexibility
 - global state
-    - see dag package if you want to manage individual graph state manually
-- thread safe
+    - see [primitive](https://godoc.org/github.com/autom8ter/dagger/primitive) to manage graph state manually
+- concurrency safe
 - high performance
 - simple api
+
+## Features
+
+- [x] native graph objects(nodes/edges)
+- [x] typed graph objects(ex: user/pet)
+- [x] labelled nodes & edges
+- [x] depth first search
+- [x] breadth first search
+- [x] concurrency safe
+- [ ] import graph from JSON blob
+- [ ] export graph to JSON blob
 
 ## Example
 
@@ -151,7 +163,3 @@ Output:
     dagger_test.go:157: {"node":{"_id":"5150f06e-b979-638e-5dd5-17a480001aee","_type":"friend"},"from":{"_id":"swash_1603572045463678000","_type":"user","name":"sarah"},"to":{"_id":"ljans_1603572045463679000","_type":"user","name":"lacee"}}
     dagger_test.go:157: {"node":{"_id":"9e39c05a-3113-930a-4ff0-d841e382fbe4","_type":"fiance"},"from":{"_id":"cword_1603572045463636000","_type":"user","name":"coleman"},"to":{"_id":"ljans_1603572045463679000","_type":"user","name":"lacee"}}
 ```
-
-## Roadmap
-- [ ] import graph from JSON blob
-- [ ] export graph to JSON blob

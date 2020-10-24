@@ -3,7 +3,6 @@ package dagger_test
 import (
 	"fmt"
 	"github.com/autom8ter/dagger"
-	"github.com/autom8ter/dagger/primitive"
 	"log"
 	"time"
 )
@@ -58,9 +57,9 @@ func ExampleNewNode() {
 		exit("expected charlie's weight to be 19!")
 	}
 	// check to make sure edge is patched
-	coleman.EdgesFrom(func(e *primitive.Edge) bool {
+	coleman.EdgesFrom(func(e *dagger.Edge) bool {
 		if e.Type() == "pet" && e.GetString("name") == "charlie" {
-			if e.To.GetInt("weight") != 19 {
+			if e.To().GetInt("weight") != 19 {
 				exit("failed to patch charlie's weight")
 			}
 		}
@@ -76,14 +75,14 @@ func ExampleNewNode() {
 		exit("failed to delete node - (charlie)")
 	}
 	// check to make sure edge no longer exists(cascade)
-	coleman.EdgesFrom(func(e *primitive.Edge) bool {
+	coleman.EdgesFrom(func(e *dagger.Edge) bool {
 		if e.Type() == "pet" && e.GetString("name") == "charlie" {
 			exit("failed to delete node - (charlie)")
 		}
 		return true
 	})
 	// check to make sure edge no longer exists(cascade)
-	lacee.EdgesFrom(func(e *primitive.Edge) bool {
+	lacee.EdgesFrom(func(e *dagger.Edge) bool {
 		if e.Type() == "pet" && e.GetString("name") == "charlie" {
 			exit("failed to delete node - (charlie)")
 		}

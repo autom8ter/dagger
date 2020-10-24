@@ -45,13 +45,25 @@ func RangeNodes(fn func(n *Node) bool) {
 }
 
 // RangeEdges iterates over all edges/connections until the iterator returns false
-func RangeEdges(fn func(e *primitive.Edge) bool) {
-	globalGraph.RangeEdges(fn)
+func RangeEdges(fn func(e *Edge) bool) {
+	globalGraph.RangeEdges(func(e *primitive.Edge) bool {
+		this, err := edgeFrom(e)
+		if err != nil {
+			panic(err)
+		}
+		return fn(this)
+	})
 }
 
 // RangeEdgeTypes iterates over edges/connections of a given type until the iterator returns false
-func RangeEdgeTypes(edgeType primitive.Type, fn func(e *primitive.Edge) bool) {
-	globalGraph.RangeEdgeTypes(edgeType, fn)
+func RangeEdgeTypes(edgeType primitive.Type, fn func(e *Edge) bool) {
+	globalGraph.RangeEdgeTypes(edgeType, func(e *primitive.Edge) bool {
+		this, err := edgeFrom(e)
+		if err != nil {
+			panic(err)
+		}
+		return fn(this)
+	})
 }
 
 // HasNode returns true if a node with the typed ID exists in the graph

@@ -7,11 +7,15 @@ import "github.com/autom8ter/dagger/primitive"
 func NewNode(nodeType, id string, attributes map[string]interface{}) *Node {
 	data := primitive.NewNode(nodeType, id)
 	data.SetAll(attributes)
-	if !globalGraph.HasNode(data) || !data.HasID() {
-		globalGraph.AddNode(data)
-		return &Node{data}
+	return nodeFrom(data)
+}
+
+func nodeFrom(node primitive.Node) *Node {
+	if !globalGraph.HasNode(node) || !node.HasID() {
+		globalGraph.AddNode(node)
+		return &Node{node}
 	}
-	return &Node{TypedID: data}
+	return &Node{TypedID: node}
 }
 
 // Node is the most basic element in the graph. Node's may be connected with one another via edges to represent relationships
@@ -20,18 +24,14 @@ type Node struct {
 }
 
 // EdgesFrom returns connections/edges that stem from the node/vertex
-func (n *Node) EdgesFrom(fn func(e *primitive.Edge) bool) {
-	globalGraph.EdgesFrom(n, fn)
-}
-
-// EdgesTo returns connections/edges that point toward the node/vertex
-func (n *Node) EdgesTo(fn func(e *primitive.Edge) bool) {
-	globalGraph.EdgesTo(n, fn)
-}
-
-// Remove permenently removes the node from the graph
-func (n *Node) Remove() {
-	globalGraph.DelNode(n)
+func (n *Node) EdgesFrom(fn func(edge *Edge) bool) {
+	globalGraph.EdgesFrom(n, func(e *primitive.Edge) bool {
+		this, err := edgeFrom(e)
+		if err != nil {
+			panic(err)
+		}
+		return fn(this)
+	})
 }
 
 func (n *Node) load() primitive.Node {
@@ -41,6 +41,22 @@ func (n *Node) load() primitive.Node {
 		node, ok = globalGraph.GetNode(n)
 	}
 	return node
+}
+
+// EdgesTo returns connections/edges that point toward the node/vertex
+func (n *Node) EdgesTo(fn func(e *Edge) bool) {
+	globalGraph.EdgesTo(n, func(e *primitive.Edge) bool {
+		this, err := edgeFrom(e)
+		if err != nil {
+			panic(err)
+		}
+		return fn(this)
+	})
+}
+
+// Remove permenently removes the node from the graph
+func (n *Node) Remove() {
+	globalGraph.DelNode(n)
 }
 
 // Connect creates a connection/edge between the two nodes with the given relationship type
