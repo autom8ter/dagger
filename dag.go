@@ -4,6 +4,13 @@ import (
 	"fmt"
 )
 
+var globalGraph = &Graph{
+	nodes:     newCache(),
+	edges:     newCache(),
+	edgesFrom: newCache(),
+	edgesTo:   newCache(),
+}
+
 // Graph is a concurrency safe, mutable, in-memory directed graph
 type Graph struct {
 	nodes     *namespacedCache
@@ -25,18 +32,34 @@ func (g *Graph) EdgeTypes() []string {
 	return g.edges.Namespaces()
 }
 
+func EdgeTypes() []string {
+	return globalGraph.EdgeTypes()
+}
+
 func (g *Graph) NodeTypes() []string {
 	return g.nodes.Namespaces()
+}
+
+func NodeTypes() []string {
+	return globalGraph.NodeTypes()
 }
 
 func (g *Graph) AddNode(n *Node) {
 	g.nodes.Set(n.Type(), n.ID(), n)
 }
 
+func AddNode(n *Node) {
+	globalGraph.AddNode(n)
+}
+
 func (g *Graph) AddNodes(nodes ...*Node) {
 	for _, n := range nodes {
 		g.AddNode(n)
 	}
+}
+
+func AddNodes(nodes ...*Node) {
+	globalGraph.AddNodes(nodes...)
 }
 
 func (g *Graph) GetNode(id TypedID) (*Node, bool) {
@@ -50,6 +73,10 @@ func (g *Graph) GetNode(id TypedID) (*Node, bool) {
 	return nil, false
 }
 
+func GetNode(id TypedID) (*Node, bool) {
+	return globalGraph.GetNode(id)
+}
+
 func (g *Graph) RangeNodeTypes(typ Type, fn func(n *Node) bool) {
 	g.nodes.Range(typ.Type(), func(key string, val interface{}) bool {
 		n, ok := val.(*Node)
@@ -60,6 +87,10 @@ func (g *Graph) RangeNodeTypes(typ Type, fn func(n *Node) bool) {
 		}
 		return true
 	})
+}
+
+func RangeNodeTypes(typ Type, fn func(n *Node) bool) {
+	globalGraph.RangeNodeTypes(typ, fn)
 }
 
 func (g *Graph) RangeNodes(fn func(n *Node) bool) {
@@ -76,6 +107,10 @@ func (g *Graph) RangeNodes(fn func(n *Node) bool) {
 	}
 }
 
+func RangeNodes(fn func(n *Node) bool) {
+	globalGraph.RangeNodes(fn)
+}
+
 func (g *Graph) RangeEdges(fn func(e *Edge) bool) {
 	for _, namespace := range g.edges.Namespaces() {
 		g.edges.Range(namespace, func(key string, val interface{}) bool {
@@ -90,6 +125,10 @@ func (g *Graph) RangeEdges(fn func(e *Edge) bool) {
 	}
 }
 
+func RangeEdges(fn func(e *Edge) bool) {
+	globalGraph.RangeEdges(fn)
+}
+
 func (g *Graph) RangeEdgeTypes(edgeType Type, fn func(e *Edge) bool) {
 	g.edges.Range(edgeType.Type(), func(key string, val interface{}) bool {
 		e, ok := val.(*Edge)
@@ -102,9 +141,17 @@ func (g *Graph) RangeEdgeTypes(edgeType Type, fn func(e *Edge) bool) {
 	})
 }
 
+func RangeEdgeTypes(edgeType Type, fn func(e *Edge) bool) {
+	globalGraph.RangeEdgeTypes(edgeType, fn)
+}
+
 func (g *Graph) HasNode(id TypedID) bool {
 	_, ok := g.GetNode(id)
 	return ok
+}
+
+func HasNode(id TypedID) bool {
+	return globalGraph.HasNode(id)
 }
 
 func (g *Graph) DelNode(id TypedID) {
@@ -118,6 +165,10 @@ func (g *Graph) DelNode(id TypedID) {
 		}
 	}
 	g.nodes.Delete(id.Type(), id.ID())
+}
+
+func DelNode(id TypedID) {
+	globalGraph.DelNode(id)
 }
 
 func (g *Graph) AddEdge(e *Edge) error {
@@ -147,6 +198,10 @@ func (g *Graph) AddEdge(e *Edge) error {
 	return nil
 }
 
+func AddEdge(e *Edge) error {
+	return globalGraph.AddEdge(e)
+}
+
 func (g *Graph) AddEdges(edges ...*Edge) error {
 	for _, e := range edges {
 		if err := g.AddEdge(e); err != nil {
@@ -156,9 +211,17 @@ func (g *Graph) AddEdges(edges ...*Edge) error {
 	return nil
 }
 
+func AddEdges(edges ...*Edge) error {
+	return globalGraph.AddEdges(edges...)
+}
+
 func (g *Graph) HasEdge(id TypedID) bool {
 	_, ok := g.GetEdge(id)
 	return ok
+}
+
+func HasEdge(id TypedID) bool {
+	return globalGraph.HasEdge(id)
 }
 
 func (g *Graph) GetEdge(id TypedID) (*Edge, bool) {
@@ -170,6 +233,10 @@ func (g *Graph) GetEdge(id TypedID) (*Edge, bool) {
 		}
 	}
 	return nil, false
+}
+
+func GetEdge(id TypedID) (*Edge, bool) {
+	return globalGraph.GetEdge(id)
 }
 
 func (g *Graph) DelEdge(id TypedID) {
@@ -192,6 +259,10 @@ func (g *Graph) DelEdge(id TypedID) {
 	g.edges.Delete(id.Type(), id.ID())
 }
 
+func DelEdge(id TypedID) {
+	globalGraph.DelEdge(id)
+}
+
 func (g *Graph) EdgesFrom(id TypedID, fn func(e *Edge) bool) {
 	val, ok := g.edgesFrom.Get(id.Type(), id.ID())
 	if ok {
@@ -201,6 +272,10 @@ func (g *Graph) EdgesFrom(id TypedID, fn func(e *Edge) bool) {
 			})
 		}
 	}
+}
+
+func EdgesFrom(id TypedID, fn func(e *Edge) bool) {
+	globalGraph.EdgesFrom(id, fn)
 }
 
 func (g *Graph) EdgesTo(id TypedID, fn func(e *Edge) bool) {
@@ -214,9 +289,17 @@ func (g *Graph) EdgesTo(id TypedID, fn func(e *Edge) bool) {
 	}
 }
 
+func EdgesTo(id TypedID, fn func(e *Edge) bool) {
+	globalGraph.EdgesTo(id, fn)
+}
+
 func (g *Graph) Close() {
 	g.nodes.Close()
 	g.edgesTo.Close()
 	g.edgesFrom.Close()
 	g.edges.Close()
+}
+
+func Close() {
+	globalGraph.Close()
 }

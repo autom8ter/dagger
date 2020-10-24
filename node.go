@@ -57,6 +57,13 @@ func (m Node) Set(k string, v interface{}) {
 	m[k] = v
 }
 
+// SetAll set all entries in the Node
+func (m Node) SetAll(data map[string]interface{}) {
+	for k, v := range data {
+		m.Set(k, v)
+	}
+}
+
 // Get gets an entry from the Node by key
 func (m Node) Get(key string) interface{} {
 	return m[key]
@@ -196,4 +203,19 @@ func (m Node) MarshalTo(obj json.Unmarshaler) error {
 		return err
 	}
 	return obj.UnmarshalJSON(bits)
+}
+
+func (n2 Node) Read(p []byte) (n int, err error) {
+	bits, err := n2.JSON()
+	if err != nil {
+		return 0, err
+	}
+	return copy(p, bits), nil
+}
+
+func (n2 Node) Write(p []byte) (n int, err error) {
+	if err := json.Unmarshal(p, &n2); err != nil {
+		return 0, err
+	}
+	return len(p), nil
 }
