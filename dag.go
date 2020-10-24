@@ -44,28 +44,28 @@ func NodeTypes() []string {
 	return globalGraph.NodeTypes()
 }
 
-func (g *Graph) AddNode(n *Node) {
+func (g *Graph) AddNode(n Node) {
 	g.nodes.Set(n.Type(), n.ID(), n)
 }
 
-func AddNode(n *Node) {
+func AddNode(n Node) {
 	globalGraph.AddNode(n)
 }
 
-func (g *Graph) AddNodes(nodes ...*Node) {
+func (g *Graph) AddNodes(nodes ...Node) {
 	for _, n := range nodes {
 		g.AddNode(n)
 	}
 }
 
-func AddNodes(nodes ...*Node) {
+func AddNodes(nodes ...Node) {
 	globalGraph.AddNodes(nodes...)
 }
 
-func (g *Graph) GetNode(id TypedID) (*Node, bool) {
+func (g *Graph) GetNode(id TypedID) (Node, bool) {
 	val, ok := g.nodes.Get(id.Type(), id.ID())
 	if ok {
-		n, ok := val.(*Node)
+		n, ok := val.(Node)
 		if ok {
 			return n, true
 		}
@@ -73,13 +73,13 @@ func (g *Graph) GetNode(id TypedID) (*Node, bool) {
 	return nil, false
 }
 
-func GetNode(id TypedID) (*Node, bool) {
+func GetNode(id TypedID) (Node, bool) {
 	return globalGraph.GetNode(id)
 }
 
-func (g *Graph) RangeNodeTypes(typ Type, fn func(n *Node) bool) {
+func (g *Graph) RangeNodeTypes(typ Type, fn func(n Node) bool) {
 	g.nodes.Range(typ.Type(), func(key string, val interface{}) bool {
-		n, ok := val.(*Node)
+		n, ok := val.(Node)
 		if ok {
 			if !fn(n) {
 				return false
@@ -89,14 +89,14 @@ func (g *Graph) RangeNodeTypes(typ Type, fn func(n *Node) bool) {
 	})
 }
 
-func RangeNodeTypes(typ Type, fn func(n *Node) bool) {
+func RangeNodeTypes(typ Type, fn func(n Node) bool) {
 	globalGraph.RangeNodeTypes(typ, fn)
 }
 
-func (g *Graph) RangeNodes(fn func(n *Node) bool) {
+func (g *Graph) RangeNodes(fn func(n Node) bool) {
 	for _, namespace := range g.nodes.Namespaces() {
 		g.nodes.Range(namespace, func(key string, val interface{}) bool {
-			n, ok := val.(*Node)
+			n, ok := val.(Node)
 			if ok {
 				if !fn(n) {
 					return false
@@ -107,7 +107,7 @@ func (g *Graph) RangeNodes(fn func(n *Node) bool) {
 	}
 }
 
-func RangeNodes(fn func(n *Node) bool) {
+func RangeNodes(fn func(n Node) bool) {
 	globalGraph.RangeNodes(fn)
 }
 

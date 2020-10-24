@@ -20,6 +20,7 @@ func Test(t *testing.T) {
 	if err := coleman.Validate(); err != nil {
 		t.Fatal(err)
 	}
+	dagger.AddNode(coleman)
 	tyler.SetID("twash")
 	tyler.SetType("user")
 	tyler.SetAll(map[string]interface{}{
