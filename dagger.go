@@ -46,39 +46,6 @@ func HasNode(id primitive.TypedID) bool {
 	return globalGraph.HasNode(id)
 }
 
-//
-//func DelNode(id primitive.TypedID) {
-//	globalGraph.DelNode(id)
-//}
-//
-//func AddEdge(e *primitive.Edge) error {
-//	return globalGraph.AddEdge(e)
-//}
-//
-//func AddEdges(edges ...*primitive.Edge) error {
-//	return globalGraph.AddEdges(edges...)
-//}
-//
-//func HasEdge(id primitive.TypedID) bool {
-//	return globalGraph.HasEdge(id)
-//}
-//
-//func GetEdge(id primitive.TypedID) (*primitive.Edge, bool) {
-//	return globalGraph.GetEdge(id)
-//}
-//
-//func DelEdge(id primitive.TypedID) {
-//	globalGraph.DelEdge(id)
-//}
-//
-//func EdgesFrom(id primitive.TypedID, fn func(e *primitive.Edge) bool) {
-//	globalGraph.EdgesFrom(id, fn)
-//}
-//
-//func EdgesTo(id primitive.TypedID, fn func(e *primitive.Edge) bool) {
-//	globalGraph.EdgesTo(id, fn)
-//}
-
 func Close() {
 	globalGraph.Close()
 }

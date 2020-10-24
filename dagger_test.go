@@ -21,6 +21,7 @@ var (
 	lacee = dagger.NewNode("user", fmt.Sprintf("ljans_%v", time.Now().UnixNano()), map[string]interface{}{
 		"name": "lacee",
 	})
+	// random id will be generated if one isn't provided
 	charlie = dagger.NewNode("dog", "", map[string]interface{}{
 		"name":   "charlie",
 		"weight": 25,
@@ -68,6 +69,7 @@ func seedT(t *testing.T) {
 	charlie.Patch(map[string]interface{}{
 		"weight": 19,
 	})
+	// check to make sure edge is patched
 	coleman.EdgesFrom(func(e *primitive.Edge) bool {
 		if e.Type() == "pet" && e.GetString("name") == "charlie" {
 			if e.To.GetInt("weight") != 19 {
@@ -76,19 +78,23 @@ func seedT(t *testing.T) {
 		}
 		return true
 	})
+	// remove from graph
 	charlie.Remove()
+	// no longer in graph
 	if dagger.HasNode(charlie) {
-		t.Fatal("failed to delete node")
+		t.Fatal("failed to delete node - (charlie)")
 	}
+	// check to make sure edge no longer exists(cascade)
 	coleman.EdgesFrom(func(e *primitive.Edge) bool {
 		if e.Type() == "pet" && e.GetString("name") == "charlie" {
-			t.Fatal("failed to delete node")
+			t.Fatal("failed to delete node - (charlie)")
 		}
 		return true
 	})
+	// check to make sure edge no longer exists(cascade)
 	lacee.EdgesFrom(func(e *primitive.Edge) bool {
 		if e.Type() == "pet" && e.GetString("name") == "charlie" {
-			t.Fatal("failed to delete node")
+			t.Fatal("failed to delete node - (charlie)")
 		}
 		return true
 	})
