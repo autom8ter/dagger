@@ -36,7 +36,7 @@ func ExampleNewNode() {
 	if err := coleman.Connect(lacee, "fiance", true); err != nil {
 		exitErr(err)
 	}
-	if err := tyler.Connect(lacee, "wife", true); err != nil {
+	if err := tyler.Connect(sarah, "wife", true); err != nil {
 		exitErr(err)
 	}
 	if err := coleman.Connect(charlie, "pet", false); err != nil {

@@ -41,7 +41,7 @@ func seedT(t *testing.T) {
 	if err := coleman.Connect(lacee, "fiance", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := tyler.Connect(lacee, "wife", true); err != nil {
+	if err := tyler.Connect(sarah, "wife", true); err != nil {
 		t.Fatal(err)
 	}
 	if err := coleman.Connect(charlie, "pet", false); err != nil {
@@ -103,7 +103,7 @@ func seedB(t *testing.B) {
 	if err := coleman.Connect(lacee, "fiance", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := tyler.Connect(lacee, "wife", true); err != nil {
+	if err := tyler.Connect(sarah, "wife", true); err != nil {
 		t.Fatal(err)
 	}
 	if err := coleman.Connect(charlie, "pet", false); err != nil {
@@ -133,8 +133,8 @@ func seedB(t *testing.B) {
 
 func Test(t *testing.T) {
 	seedT(t)
-	t.Log(dagger.NodeTypes())
-	t.Log(dagger.EdgeTypes())
+	t.Logf("registered node types = %v\n", dagger.NodeTypes())
+	t.Logf("registered edge types = %v\n", dagger.EdgeTypes())
 	dagger.RangeNodes(func(n *dagger.Node) bool {
 		bits, err := n.JSON()
 		if err != nil {
