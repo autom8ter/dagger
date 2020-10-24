@@ -1,4 +1,4 @@
-package dagger
+package primitive
 
 // edgeMap is a map of edges. edgeMap are not concurrency safe.
 type edgeMap map[string]map[string]*Edge
