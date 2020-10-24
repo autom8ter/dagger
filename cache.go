@@ -81,37 +81,37 @@ func (n *namespacedCache) Exists(namespace string, key interface{}) bool {
 	return n.cacheMap[namespace].Exists(key)
 }
 
-func (n *namespacedCache) Copy(namespace string) Values {
+func (n *namespacedCache) Copy(namespace string) Node {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.cacheMap[namespace].Copy()
 }
 
-func (n *namespacedCache) Filter(namespace string, filter func(k, v interface{}) bool) Values {
+func (n *namespacedCache) Filter(namespace string, filter func(k, v interface{}) bool) Node {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.cacheMap[namespace].Filter(filter)
 }
 
-func (n *namespacedCache) Intersection(namespace1, namespace2 string) Values {
+func (n *namespacedCache) Intersection(namespace1, namespace2 string) Node {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.cacheMap[namespace1].Intersection(n.cacheMap[namespace2])
 }
 
-func (n *namespacedCache) Union(namespace1, namespace2 string) Values {
+func (n *namespacedCache) Union(namespace1, namespace2 string) Node {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.cacheMap[namespace1].Union(n.cacheMap[namespace2])
 }
 
-func (n *namespacedCache) Map(namespace string) Values {
+func (n *namespacedCache) Map(namespace string) Node {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.cacheMap[namespace].Map()
 }
 
-func (n *namespacedCache) SetAll(namespace string, m Values) {
+func (n *namespacedCache) SetAll(namespace string, m Node) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if _, ok := n.cacheMap[namespace]; !ok {
@@ -191,7 +191,7 @@ func (c *cache) Close() {
 	})
 }
 
-func (c *cache) Map() Values {
+func (c *cache) Map() Node {
 	data := make(map[string]interface{})
 	c.Range(func(key string, value interface{}) bool {
 		data[key] = value
@@ -200,15 +200,15 @@ func (c *cache) Map() Values {
 	return data
 }
 
-func (c *cache) SetAll(m Values) {
+func (c *cache) SetAll(m Node) {
 	m.Range(func(k string, v interface{}) bool {
 		c.Set(k, v)
 		return true
 	})
 }
 
-func (c *cache) Intersection(other *cache) Values {
-	data := Values{}
+func (c *cache) Intersection(other *cache) Node {
+	data := Node{}
 	if c == nil {
 		return data
 	}
@@ -223,8 +223,8 @@ func (c *cache) Intersection(other *cache) Values {
 	return data
 }
 
-func (c *cache) Union(other *cache) Values {
-	data := Values{}
+func (c *cache) Union(other *cache) Node {
+	data := Node{}
 	if c != nil {
 		c.Range(func(k string, v interface{}) bool {
 			data.Set(k, v)
@@ -240,8 +240,8 @@ func (c *cache) Union(other *cache) Values {
 	return data
 }
 
-func (c *cache) Copy() Values {
-	data := Values{}
+func (c *cache) Copy() Node {
+	data := Node{}
 	if c == nil {
 		return data
 	}
@@ -252,8 +252,8 @@ func (c *cache) Copy() Values {
 	return data
 }
 
-func (c *cache) Filter(filter func(k, v interface{}) bool) Values {
-	data := Values{}
+func (c *cache) Filter(filter func(k, v interface{}) bool) Node {
+	data := Node{}
 	if c == nil {
 		return data
 	}
