@@ -59,6 +59,9 @@ func seedT(t *testing.T) {
 	charlie.Patch(map[string]interface{}{
 		"weight": 19,
 	})
+	if charlie.GetInt("weight") != 19 {
+		t.Fatal("expected charlie's weight to be 19!")
+	}
 	// check to make sure edge is patched
 	coleman.EdgesFrom(func(e *primitive.Edge) bool {
 		if e.Type() == "pet" && e.GetString("name") == "charlie" {

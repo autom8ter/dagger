@@ -2,18 +2,23 @@ package dagger
 
 import (
 	"github.com/autom8ter/dagger/primitive"
+	"sort"
 )
 
 var globalGraph = primitive.NewGraph()
 
 // EdgeTypes returns the types of relationships/edges/connections in the graph
 func EdgeTypes() []string {
-	return globalGraph.EdgeTypes()
+	edgeTypes := globalGraph.EdgeTypes()
+	sort.Strings(edgeTypes)
+	return edgeTypes
 }
 
 // NodeTypes returns the types of nodes in the graph
 func NodeTypes() []string {
-	return globalGraph.NodeTypes()
+	nodeTypes := globalGraph.NodeTypes()
+	sort.Strings(nodeTypes)
+	return nodeTypes
 }
 
 // GetNode gets a node from the graph

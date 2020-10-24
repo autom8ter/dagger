@@ -89,6 +89,12 @@ func ExampleNewNode() {
 		}
 		return true
 	})
+	fmt.Printf("registered node types = %v\n", dagger.NodeTypes())
+	fmt.Printf("registered edge types = %v\n", dagger.EdgeTypes())
+
+	// Output:
+	// registered node types = [dog user]
+	// registered edge types = [fiance friend owner pet wife]
 }
 
 func exit(msg string) {
