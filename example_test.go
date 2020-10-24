@@ -27,45 +27,36 @@ func ExampleNewNode() {
 		"weight": 25,
 	})
 
-	if err := coleman.Connect(tyler, "friend"); err != nil {
+	if err := coleman.Connect(tyler, "friend", true); err != nil {
 		exitErr(err)
 	}
-	if err := tyler.Connect(coleman, "friend"); err != nil {
+	if err := sarah.Connect(lacee, "friend", true); err != nil {
 		exitErr(err)
 	}
-	if err := sarah.Connect(lacee, "friend"); err != nil {
+	if err := coleman.Connect(lacee, "fiance", true); err != nil {
 		exitErr(err)
 	}
-	if err := lacee.Connect(sarah, "friend"); err != nil {
+	if err := tyler.Connect(lacee, "wife", true); err != nil {
 		exitErr(err)
 	}
-	if err := coleman.Connect(lacee, "fiance"); err != nil {
+	if err := coleman.Connect(charlie, "pet", false); err != nil {
 		exitErr(err)
 	}
-	if err := lacee.Connect(coleman, "fiance"); err != nil {
+	if err := lacee.Connect(charlie, "pet", false); err != nil {
 		exitErr(err)
 	}
-	if err := tyler.Connect(lacee, "wife"); err != nil {
+	if err := charlie.Connect(lacee, "owner", false); err != nil {
 		exitErr(err)
 	}
-	if err := sarah.Connect(tyler, "wife"); err != nil {
-		exitErr(err)
-	}
-	if err := coleman.Connect(charlie, "pet"); err != nil {
-		exitErr(err)
-	}
-	if err := lacee.Connect(charlie, "pet"); err != nil {
-		exitErr(err)
-	}
-	if err := charlie.Connect(lacee, "owner"); err != nil {
-		exitErr(err)
-	}
-	if err := charlie.Connect(coleman, "owner"); err != nil {
+	if err := charlie.Connect(coleman, "owner", false); err != nil {
 		exitErr(err)
 	}
 	charlie.Patch(map[string]interface{}{
 		"weight": 19,
 	})
+	if charlie.GetInt("weight") != 19 {
+		exit("expected charlie's weight to be 19!")
+	}
 	// check to make sure edge is patched
 	coleman.EdgesFrom(func(e *primitive.Edge) bool {
 		if e.Type() == "pet" && e.GetString("name") == "charlie" {
@@ -75,6 +66,9 @@ func ExampleNewNode() {
 		}
 		return true
 	})
+	if coleman.GetString("name") != "coleman" {
+		exit("expected name to be coleman")
+	}
 	// remove from graph
 	charlie.Remove()
 	// no longer in graph

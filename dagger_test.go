@@ -29,41 +29,31 @@ var (
 )
 
 func seedT(t *testing.T) {
-
-	if err := coleman.Connect(tyler, "friend"); err != nil {
+	if coleman.GetString("name") != "coleman" {
+		exit("expected name to be coleman")
+	}
+	if err := coleman.Connect(tyler, "friend", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := tyler.Connect(coleman, "friend"); err != nil {
+	if err := sarah.Connect(lacee, "friend", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := sarah.Connect(lacee, "friend"); err != nil {
+	if err := coleman.Connect(lacee, "fiance", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := lacee.Connect(sarah, "friend"); err != nil {
+	if err := tyler.Connect(lacee, "wife", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := coleman.Connect(lacee, "fiance"); err != nil {
+	if err := coleman.Connect(charlie, "pet", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := lacee.Connect(coleman, "fiance"); err != nil {
+	if err := lacee.Connect(charlie, "pet", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := tyler.Connect(lacee, "wife"); err != nil {
+	if err := charlie.Connect(lacee, "owner", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := sarah.Connect(tyler, "wife"); err != nil {
-		t.Fatal(err)
-	}
-	if err := coleman.Connect(charlie, "pet"); err != nil {
-		t.Fatal(err)
-	}
-	if err := lacee.Connect(charlie, "pet"); err != nil {
-		t.Fatal(err)
-	}
-	if err := charlie.Connect(lacee, "owner"); err != nil {
-		t.Fatal(err)
-	}
-	if err := charlie.Connect(coleman, "owner"); err != nil {
+	if err := charlie.Connect(coleman, "owner", false); err != nil {
 		t.Fatal(err)
 	}
 	charlie.Patch(map[string]interface{}{
@@ -101,40 +91,28 @@ func seedT(t *testing.T) {
 }
 
 func seedB(t *testing.B) {
-	if err := coleman.Connect(tyler, "friend"); err != nil {
+	if err := coleman.Connect(tyler, "friend", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := tyler.Connect(coleman, "friend"); err != nil {
+	if err := sarah.Connect(lacee, "friend", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := sarah.Connect(lacee, "friend"); err != nil {
+	if err := coleman.Connect(lacee, "fiance", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := lacee.Connect(sarah, "friend"); err != nil {
+	if err := tyler.Connect(lacee, "wife", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := coleman.Connect(lacee, "fiance"); err != nil {
+	if err := coleman.Connect(charlie, "pet", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := lacee.Connect(coleman, "fiance"); err != nil {
+	if err := lacee.Connect(charlie, "pet", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := tyler.Connect(lacee, "wife"); err != nil {
+	if err := charlie.Connect(lacee, "owner", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := sarah.Connect(tyler, "wife"); err != nil {
-		t.Fatal(err)
-	}
-	if err := coleman.Connect(charlie, "pet"); err != nil {
-		t.Fatal(err)
-	}
-	if err := lacee.Connect(charlie, "pet"); err != nil {
-		t.Fatal(err)
-	}
-	if err := charlie.Connect(lacee, "owner"); err != nil {
-		t.Fatal(err)
-	}
-	if err := charlie.Connect(coleman, "owner"); err != nil {
+	if err := charlie.Connect(coleman, "owner", false); err != nil {
 		t.Fatal(err)
 	}
 	charlie.Patch(map[string]interface{}{
