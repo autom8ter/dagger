@@ -42,10 +42,10 @@ func RangeEdgeTypes(edgeType primitive.Type, fn func(e *primitive.Edge) bool) {
 	globalGraph.RangeEdgeTypes(edgeType, fn)
 }
 
-//
-//func HasNode(id primitive.TypedID) bool {
-//	return globalGraph.HasNode(id)
-//}
+func HasNode(id primitive.TypedID) bool {
+	return globalGraph.HasNode(id)
+}
+
 //
 //func DelNode(id primitive.TypedID) {
 //	globalGraph.DelNode(id)

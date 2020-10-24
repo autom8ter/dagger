@@ -65,10 +65,36 @@ func seedT(t *testing.T) {
 	if err := charlie.Connect(coleman, "owner"); err != nil {
 		t.Fatal(err)
 	}
+	charlie.Patch(map[string]interface{}{
+		"weight": 19,
+	})
+	coleman.EdgesFrom(func(e *primitive.Edge) bool {
+		if e.Type() == "pet" && e.GetString("name") == "charlie" {
+			if e.To.GetInt("weight") != 19 {
+				t.Fatal("failed to patch charlie's weight")
+			}
+		}
+		return true
+	})
+	charlie.Remove()
+	if dagger.HasNode(charlie) {
+		t.Fatal("failed to delete node")
+	}
+	coleman.EdgesFrom(func(e *primitive.Edge) bool {
+		if e.Type() == "pet" && e.GetString("name") == "charlie" {
+			t.Fatal("failed to delete node")
+		}
+		return true
+	})
+	lacee.EdgesFrom(func(e *primitive.Edge) bool {
+		if e.Type() == "pet" && e.GetString("name") == "charlie" {
+			t.Fatal("failed to delete node")
+		}
+		return true
+	})
 }
 
 func seedB(t *testing.B) {
-
 	if err := coleman.Connect(tyler, "friend"); err != nil {
 		t.Fatal(err)
 	}
@@ -105,6 +131,17 @@ func seedB(t *testing.B) {
 	if err := charlie.Connect(coleman, "owner"); err != nil {
 		t.Fatal(err)
 	}
+	charlie.Patch(map[string]interface{}{
+		"weight": 19,
+	})
+	coleman.EdgesFrom(func(e *primitive.Edge) bool {
+		if e.Type() == "pet" && e.GetString("name") == "charlie" {
+			if e.To.GetInt("weight") != 19 {
+				t.Fatal("failed to patch charlie's weight")
+			}
+		}
+		return true
+	})
 }
 
 func Test(t *testing.T) {
