@@ -45,6 +45,9 @@ func NodeTypes() []string {
 }
 
 func (g *Graph) AddNode(n Node) {
+	if n.ID() == "" {
+		n.SetID(uuid())
+	}
 	g.nodes.Set(n.Type(), n.ID(), n)
 }
 
@@ -172,6 +175,9 @@ func DelNode(id TypedID) {
 }
 
 func (g *Graph) AddEdge(e *Edge) error {
+	if e.ID() == "" {
+		e.SetID(uuid())
+	}
 	if !g.HasNode(e.From) {
 		return fmt.Errorf("node %s does not exist", e.From.Type())
 	}

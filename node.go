@@ -105,7 +105,7 @@ func (m Node) Range(iterator func(key string, v interface{}) bool) {
 	}
 }
 
-// Filter returns a Node of the values that return true from the filter function
+// Filter returns a Node of the node that return true from the filter function
 func (m Node) Filter(filter func(key string, v interface{}) bool) Node {
 	data := Node{}
 	if m == nil {
@@ -120,7 +120,7 @@ func (m Node) Filter(filter func(key string, v interface{}) bool) Node {
 	return data
 }
 
-// Intersection returns the values that exist in both Nodes ref: https://en.wikipedia.org/wiki/Intersection_(set_theory)#:~:text=In%20mathematics%2C%20the%20intersection%20of,that%20also%20belong%20to%20A).
+// Intersection returns the node that exist in both Nodes ref: https://en.wikipedia.org/wiki/Intersection_(set_theory)#:~:text=In%20mathematics%2C%20the%20intersection%20of,that%20also%20belong%20to%20A).
 func (m Node) Intersection(other Node) Node {
 	toReturn := Node{}
 	m.Range(func(key string, v interface{}) bool {
@@ -132,7 +132,7 @@ func (m Node) Intersection(other Node) Node {
 	return toReturn
 }
 
-// Union returns the all values in both Nodes ref: https://en.wikipedia.org/wiki/Union_(set_theory)
+// Union returns the all node in both Nodes ref: https://en.wikipedia.org/wiki/Union_(set_theory)
 func (m Node) Union(other Node) Node {
 	toReturn := Node{}
 	m.Range(func(k string, v interface{}) bool {
@@ -165,8 +165,8 @@ func (v Node) Equals(other Node) bool {
 
 func (v Node) GetNested(key string) (Node, bool) {
 	if val, ok := v[key]; ok && val != nil {
-		if values, ok := val.(Node); ok {
-			return values, true
+		if node, ok := val.(Node); ok {
+			return node, true
 		}
 	}
 	return nil, false
@@ -177,8 +177,8 @@ func (v Node) IsNested(key string) bool {
 	return ok
 }
 
-func (v Node) SetNested(key string, values Node) {
-	v.Set(key, values)
+func (v Node) SetNested(key string, node Node) {
+	v.Set(key, node)
 }
 
 func (v Node) JSON() ([]byte, error) {
@@ -187,22 +187,6 @@ func (v Node) JSON() ([]byte, error) {
 
 func (m Node) FromJSON(data []byte) error {
 	return json.Unmarshal(data, &m)
-}
-
-func (m Node) UnmarshalFrom(obj json.Marshaler) error {
-	bits, err := obj.MarshalJSON()
-	if err != nil {
-		return err
-	}
-	return m.FromJSON(bits)
-}
-
-func (m Node) MarshalTo(obj json.Unmarshaler) error {
-	bits, err := m.JSON()
-	if err != nil {
-		return err
-	}
-	return obj.UnmarshalJSON(bits)
 }
 
 func (n2 Node) Read(p []byte) (n int, err error) {
@@ -214,7 +198,7 @@ func (n2 Node) Read(p []byte) (n int, err error) {
 }
 
 func (n2 Node) Write(p []byte) (n int, err error) {
-	if err := json.Unmarshal(p, &n2); err != nil {
+	if err := n2.FromJSON(p); err != nil {
 		return 0, err
 	}
 	return len(p), nil
