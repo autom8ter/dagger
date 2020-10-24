@@ -7,6 +7,30 @@ import (
 
 var globalGraph = primitive.NewGraph()
 
+// NodeCount returns the total number of nodes in the graph
+func NodeCount() int {
+	i := 0
+	globalGraph.RangeNodes(func(n primitive.Node) bool {
+		if n != nil {
+			i++
+		}
+		return true
+	})
+	return i
+}
+
+// EdgeCount returns the total number of edges in the graph
+func EdgeCount() int {
+	i := 0
+	globalGraph.RangeEdges(func(n *primitive.Edge) bool {
+		if n != nil {
+			i++
+		}
+		return true
+	})
+	return i
+}
+
 // EdgeTypes returns the types of relationships/edges/connections in the graph
 func EdgeTypes() []string {
 	edgeTypes := globalGraph.EdgeTypes()
