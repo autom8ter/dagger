@@ -59,36 +59,38 @@ func (m Node) Set(k string, v interface{}) {
 
 // Get gets an entry from the Node by key
 func (m Node) Get(key string) interface{} {
-	if m == nil {
-		m = map[string]interface{}{}
-	}
 	return m[key]
 }
 
 // GetString gets an entry from the Node by key
 func (m Node) GetString(key string) string {
-	if m == nil {
-		m = map[string]interface{}{}
-	}
 	if !m.Exists(key) {
 		return ""
 	}
-	return m[key].(string)
+	return parseString(m[key])
+}
+
+func (m Node) GetBool(key string) bool {
+	if !m.Exists(key) {
+		return false
+	}
+	return parseBool(m[key])
+}
+
+func (m Node) GetInt(key string) int {
+	if !m.Exists(key) {
+		return 0
+	}
+	return parseInt(m[key])
 }
 
 // Del deletes the entry from the Node by key
 func (m Node) Del(key string) {
-	if m == nil {
-		m = map[string]interface{}{}
-	}
 	delete(m, key)
 }
 
 // Range iterates over the Node with the function. If the function returns false, the iteration exits.
 func (m Node) Range(iterator func(key string, v interface{}) bool) {
-	if m == nil {
-		m = map[string]interface{}{}
-	}
 	for k, v := range m {
 		if !iterator(k, v) {
 			break
@@ -98,9 +100,6 @@ func (m Node) Range(iterator func(key string, v interface{}) bool) {
 
 // Filter returns a Node of the values that return true from the filter function
 func (m Node) Filter(filter func(key string, v interface{}) bool) Node {
-	if m == nil {
-		m = map[string]interface{}{}
-	}
 	data := Node{}
 	if m == nil {
 		return data
@@ -116,9 +115,6 @@ func (m Node) Filter(filter func(key string, v interface{}) bool) Node {
 
 // Intersection returns the values that exist in both Nodes ref: https://en.wikipedia.org/wiki/Intersection_(set_theory)#:~:text=In%20mathematics%2C%20the%20intersection%20of,that%20also%20belong%20to%20A).
 func (m Node) Intersection(other Node) Node {
-	if m == nil {
-		m = map[string]interface{}{}
-	}
 	toReturn := Node{}
 	m.Range(func(key string, v interface{}) bool {
 		if other.Exists(key) {
