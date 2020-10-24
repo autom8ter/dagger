@@ -58,7 +58,7 @@ func ExampleNewNode() {
 	}
 	// check to make sure edge is patched
 	coleman.EdgesFrom(func(e *dagger.Edge) bool {
-		if e.Type() == "pet" && e.GetString("name") == "charlie" {
+		if e.Type() == "pet" {
 			if e.To().GetInt("weight") != 19 {
 				exit("failed to patch charlie's weight")
 			}
