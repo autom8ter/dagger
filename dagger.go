@@ -99,3 +99,8 @@ func HasNode(id primitive.TypedID) bool {
 func Close() {
 	globalGraph.Close()
 }
+
+// ForeignKey is a helper that returns a primitive.TypedID from the given type and id
+func ForeignKey(typ, id string) primitive.TypedID {
+	return primitive.ForeignKey(typ, id)
+}
