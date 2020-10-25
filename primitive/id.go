@@ -33,3 +33,23 @@ func StringType(typ string) Type {
 		return typ
 	})
 }
+
+type foreignKey struct {
+	typ string
+	id  string
+}
+
+func (f foreignKey) ID() string {
+	return f.id
+}
+
+func (f foreignKey) Type() string {
+	return f.typ
+}
+
+func ForeignKey(typ string, id string) TypedID {
+	return &foreignKey{
+		typ: typ,
+		id:  id,
+	}
+}
