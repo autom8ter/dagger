@@ -1,6 +1,9 @@
 package dagger
 
-import "github.com/autom8ter/dagger/primitive"
+import (
+	"fmt"
+	"github.com/autom8ter/dagger/primitive"
+)
 
 // NewNode creates a new node in the global, in-memory graph.
 // If an id is not provided, a random uuid will be assigned.
@@ -61,7 +64,11 @@ func (n *Node) Remove() {
 
 // Connect creates a connection/edge between the two nodes with the given relationship type
 // if mutual = true, the connection is doubly linked - (facebook is mutual, instagram is not)
-func (n *Node) Connect(node *Node, relationship string, mutual bool) error {
+func (n *Node) Connect(nodeID primitive.TypedID, relationship string, mutual bool) error {
+	node, ok := GetNode(nodeID)
+	if !ok {
+		return fmt.Errorf("node: %s %s does not exist", nodeID.Type(), nodeID.ID())
+	}
 	if !mutual {
 		return globalGraph.AddEdge(&primitive.Edge{
 			Node: primitive.NewNode(relationship, ""),
