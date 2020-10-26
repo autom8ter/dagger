@@ -146,3 +146,8 @@ func (n *Node) FromJSON(bits []byte) error {
 	node := n.load()
 	return node.FromJSON(bits)
 }
+
+// Raw returns the underlying map[string]interface{}. The map should be treated as readonly.
+func (n *Node) Raw() map[string]interface{} {
+	return n.load()
+}
