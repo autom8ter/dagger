@@ -3,6 +3,7 @@ package dagger_test
 import (
 	"fmt"
 	"github.com/autom8ter/dagger"
+	"os"
 	"testing"
 	"time"
 )
@@ -158,6 +159,13 @@ func Test(t *testing.T) {
 		})
 		return true
 	})
+	os.Remove("testing.json")
+	f, err := os.Create("testing.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	dagger.Export(f)
 }
 
 func Benchmark(t *testing.B) {

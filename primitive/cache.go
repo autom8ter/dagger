@@ -81,6 +81,28 @@ func (n *namespacedCache) Exists(namespace string, key interface{}) bool {
 	return n.cacheMap[namespace].Exists(key)
 }
 
+func (n *namespacedCache) Raw() map[string]map[string]interface{} {
+	raw := map[string]map[string]interface{}{}
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	for k, v := range n.cacheMap {
+		raw[k] = v.Raw()
+	}
+	return raw
+}
+
+func (n *namespacedCache) FromRaw(rawData map[string]map[string]interface{}) {
+	for k, v := range rawData {
+		if _, ok := n.cacheMap[k]; !ok {
+			n.cacheMap[k] = &cache{
+				data: sync.Map{},
+				once: sync.Once{},
+			}
+		}
+		n.cacheMap[k].FromRaw(v)
+	}
+}
+
 func (n *namespacedCache) Copy(namespace string) Node {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -271,4 +293,19 @@ func (c *cache) Clear() {
 		c.Delete(key)
 		return true
 	})
+}
+
+func (c *cache) Raw() map[string]interface{} {
+	raw := map[string]interface{}{}
+	c.Range(func(key string, value interface{}) bool {
+		raw[key] = value
+		return true
+	})
+	return raw
+}
+
+func (c *cache) FromRaw(data map[string]interface{}) {
+	for k, v := range data {
+		c.data.Store(k, v)
+	}
 }

@@ -23,8 +23,8 @@ dagger is a blazing fast, concurrency safe, mutable, in-memory directed graph im
 - [x] depth first search
 - [x] breadth first search
 - [x] concurrency safe
-- [ ] import graph from JSON blob
-- [ ] export graph to JSON blob
+- [x] import graph from JSON blob
+- [x] export graph to JSON blob
 
 ## Example
 

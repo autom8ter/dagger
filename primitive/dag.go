@@ -224,6 +224,32 @@ func (g *Graph) EdgesTo(id TypedID, fn func(e *Edge) bool) {
 	}
 }
 
+func (g *Graph) Raw() map[string]map[string]map[string]interface{} {
+	raw := map[string]map[string]map[string]interface{}{}
+	raw["edgesFrom"] = g.edgesFrom.Raw()
+	raw["edgesTo"] = g.edgesTo.Raw()
+	raw["edges"] = g.edges.Raw()
+	raw["nodes"] = g.nodes.Raw()
+	return raw
+}
+
+func (g *Graph) FromRaw(data map[string]map[string]map[string]interface{}) {
+	for k, v := range data {
+		if k == "edgesFrom" {
+			g.edgesFrom.FromRaw(v)
+		}
+		if k == "edgesTo" {
+			g.edgesTo.FromRaw(v)
+		}
+		if k == "edges" {
+			g.edges.FromRaw(v)
+		}
+		if k == "nodes" {
+			g.nodes.FromRaw(v)
+		}
+	}
+}
+
 func (g *Graph) Close() {
 	g.nodes.Close()
 	g.edgesTo.Close()

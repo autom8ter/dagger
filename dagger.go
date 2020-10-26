@@ -1,7 +1,9 @@
 package dagger
 
 import (
+	"encoding/json"
 	"github.com/autom8ter/dagger/primitive"
+	"io"
 	"sort"
 )
 
@@ -103,4 +105,20 @@ func Close() {
 // ForeignKey is a helper that returns a primitive.TypedID from the given type and id
 func ForeignKey(typ, id string) primitive.TypedID {
 	return primitive.ForeignKey(typ, id)
+}
+
+// ExportJSON exports the graph as a json blob into the io Writer
+func ExportJSON(w io.Writer) error {
+	raw := globalGraph.Raw()
+	return json.NewEncoder(w).Encode(&raw)
+}
+
+// ImportJSON imports the json blob into the graph from the io Reader
+func ImportJSON(r io.Reader) error {
+	raw := map[string]map[string]map[string]interface{}{}
+	if err := json.NewDecoder(r).Decode(&raw); err != nil {
+		return err
+	}
+	globalGraph.FromRaw(raw)
+	return nil
 }

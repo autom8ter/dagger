@@ -28,6 +28,12 @@ func StringID(id string) ID {
 	})
 }
 
+func RandomID() ID {
+	return stringFunc(func() string {
+		return uuid()
+	})
+}
+
 func StringType(typ string) Type {
 	return stringFunc(func() string {
 		return typ
