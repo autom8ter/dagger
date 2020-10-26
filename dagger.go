@@ -109,16 +109,18 @@ func ForeignKey(typ, id string) primitive.TypedID {
 
 // ExportJSON exports the graph as a json blob into the io Writer
 func ExportJSON(w io.Writer) error {
-	raw := globalGraph.Raw()
-	return json.NewEncoder(w).Encode(&raw)
+	export := globalGraph.Export()
+	return json.NewEncoder(w).Encode(&export)
 }
 
 // ImportJSON imports the json blob into the graph from the io Reader
 func ImportJSON(r io.Reader) error {
-	raw := map[string]map[string]map[string]interface{}{}
-	if err := json.NewDecoder(r).Decode(&raw); err != nil {
+	export := &primitive.Export{}
+	if err := json.NewDecoder(r).Decode(&export); err != nil {
 		return err
 	}
-	globalGraph.FromRaw(raw)
+	if err := globalGraph.Import(export); err != nil {
+		return err
+	}
 	return nil
 }

@@ -2,10 +2,12 @@ package primitive
 
 import (
 	"fmt"
+	"sync"
 )
 
 // Graph is a concurrency safe, mutable, in-memory directed graph
 type Graph struct {
+	mu sync.RWMutex
 	nodes     *namespacedCache
 	edges     *namespacedCache
 	edgesFrom *namespacedCache
@@ -14,6 +16,7 @@ type Graph struct {
 
 func NewGraph() *Graph {
 	return &Graph{
+		mu: sync.RWMutex{},
 		nodes:     newCache(),
 		edges:     newCache(),
 		edgesFrom: newCache(),
@@ -130,10 +133,10 @@ func (g *Graph) AddEdge(e *Edge) error {
 		return err
 	}
 	if !g.HasNode(e.From) {
-		return fmt.Errorf("node %s does not exist", e.From.Type())
+		return fmt.Errorf("node %s.%s does not exist", e.From.Type(), e.From.ID())
 	}
 	if !g.HasNode(e.To) {
-		return fmt.Errorf("node does not exist")
+		return fmt.Errorf("node %s.%s does not exist", e.To.Type(), e.To.ID())
 	}
 	g.edges.Set(e.Type(), e.ID(), e)
 	if val, ok := g.edgesFrom.Get(e.From.Type(), e.From.ID()); ok {
@@ -224,30 +227,29 @@ func (g *Graph) EdgesTo(id TypedID, fn func(e *Edge) bool) {
 	}
 }
 
-func (g *Graph) Raw() map[string]map[string]map[string]interface{} {
-	raw := map[string]map[string]map[string]interface{}{}
-	raw["edgesFrom"] = g.edgesFrom.Raw()
-	raw["edgesTo"] = g.edgesTo.Raw()
-	raw["edges"] = g.edges.Raw()
-	raw["nodes"] = g.nodes.Raw()
-	return raw
+func (g *Graph) Export() *Export {
+	exp := &Export{}
+	g.RangeNodes(func(n Node) bool {
+		exp.Nodes = append(exp.Nodes, n)
+		return true
+	})
+	g.RangeEdges(func(e *Edge) bool {
+		exp.Edges = append(exp.Edges, e)
+		return true
+	})
+	return exp
 }
 
-func (g *Graph) FromRaw(data map[string]map[string]map[string]interface{}) {
-	for k, v := range data {
-		if k == "edgesFrom" {
-			g.edgesFrom.FromRaw(v)
-		}
-		if k == "edgesTo" {
-			g.edgesTo.FromRaw(v)
-		}
-		if k == "edges" {
-			g.edges.FromRaw(v)
-		}
-		if k == "nodes" {
-			g.nodes.FromRaw(v)
+func (g *Graph) Import(exp *Export) error {
+	for _, n := range exp.Nodes {
+		g.AddNode(n)
+	}
+	for _, e := range exp.Edges {
+		if err := g.AddEdge(e); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 func (g *Graph) Close() {
