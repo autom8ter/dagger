@@ -7,7 +7,7 @@ import (
 
 // Graph is a concurrency safe, mutable, in-memory directed graph
 type Graph struct {
-	mu sync.RWMutex
+	mu        sync.RWMutex
 	nodes     *namespacedCache
 	edges     *namespacedCache
 	edgesFrom *namespacedCache
@@ -16,7 +16,7 @@ type Graph struct {
 
 func NewGraph() *Graph {
 	return &Graph{
-		mu: sync.RWMutex{},
+		mu:        sync.RWMutex{},
 		nodes:     newCache(),
 		edges:     newCache(),
 		edgesFrom: newCache(),
@@ -245,9 +245,7 @@ func (g *Graph) Import(exp *Export) error {
 		g.AddNode(n)
 	}
 	for _, e := range exp.Edges {
-		if err := g.AddEdge(e); err != nil {
-			return err
-		}
+		g.AddEdge(e)
 	}
 	return nil
 }
