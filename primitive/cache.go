@@ -92,14 +92,14 @@ func (n *namespacedCache) Raw() map[string]map[string]interface{} {
 }
 
 func (n *namespacedCache) FromRaw(rawData map[string]map[string]interface{}) {
-	for k, v := range rawData {
-		if _, ok := n.cacheMap[k]; !ok {
-			n.cacheMap[k] = &cache{
+	for namespace, v := range rawData {
+		if _, ok := n.cacheMap[namespace]; !ok {
+			n.cacheMap[namespace] = &cache{
 				data: sync.Map{},
 				once: sync.Once{},
 			}
 		}
-		n.cacheMap[k].FromRaw(v)
+		n.cacheMap[namespace].FromRaw(v)
 	}
 }
 
@@ -295,17 +295,17 @@ func (c *cache) Clear() {
 	})
 }
 
-func (c *cache) Raw() map[string]interface{} {
-	raw := map[string]interface{}{}
-	c.Range(func(key string, value interface{}) bool {
-		raw[key] = value
-		return true
-	})
-	return raw
-}
-
 func (c *cache) FromRaw(data map[string]interface{}) {
 	for k, v := range data {
 		c.data.Store(k, v)
 	}
+}
+
+func (c *cache) Raw() map[string]interface{} {
+	data := map[string]interface{}{}
+	c.Range(func(key string, value interface{}) bool {
+		data[key] = value
+		return true
+	})
+	return data
 }

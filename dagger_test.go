@@ -159,13 +159,7 @@ func Test(t *testing.T) {
 		})
 		return true
 	})
-	os.Remove("testing.json")
-	f, err := os.Create("testing.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	dagger.Export(f)
+
 }
 
 func Benchmark(t *testing.B) {
@@ -197,4 +191,39 @@ func Benchmark(t *testing.B) {
 	t.Logf("visited: %v nodes", nodes)
 	t.Logf("visited: %v edgesFrom", edgesFrom)
 	t.Logf("visited: %v edgesTo", edgesTo)
+}
+
+func TestExportJSON(t *testing.T) {
+	os.Remove("testing.json")
+	_ = dagger.NewNode("user", "cword", nil)
+	{
+		f, err := os.Create("testing.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := dagger.ExportJSON(f); err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+	}
+	dagger.Close()
+	{
+		f, err := os.Open("testing.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := dagger.ImportJSON(f); err != nil {
+			t.Fatal(err)
+		}
+		t.Log(dagger.NodeTypes())
+		t.Log(dagger.EdgeCount())
+		t.Log(dagger.NodeCount())
+		dagger.RangeEdges(func(n *dagger.Edge) bool {
+			t.Logf("%s.%s", n.Type(), n.ID())
+			return true
+		})
+		if !dagger.HasNode(dagger.ForeignKey("user", "cword")) {
+			t.Fatal("import failed")
+		}
+	}
 }
