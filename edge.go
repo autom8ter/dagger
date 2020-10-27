@@ -63,6 +63,11 @@ func (e *Edge) Range(fn func(key string, value interface{}) bool) {
 	edge.Range(fn)
 }
 
+func (e *Edge) Node() *Node {
+	edge := e.load()
+	return nodeFrom(edge.Node)
+}
+
 // GetString gets a string value from the edges attributes(if it exists)
 func (e *Edge) GetString(key string) string {
 	edge := e.load()
