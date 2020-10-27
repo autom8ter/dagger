@@ -97,14 +97,19 @@ func HasNode(id primitive.TypedID) bool {
 	return globalGraph.HasNode(id)
 }
 
+// DelNode deletes a node from the graph
+func DelNode(id primitive.TypedID) {
+	globalGraph.DelNode(id)
+}
+
+// DelEdge deletes an edge from the graph
+func DelEdge(id primitive.TypedID) {
+	globalGraph.DelEdge(id)
+}
+
 // Close closes the global graph instance
 func Close() {
 	globalGraph.Close()
-}
-
-// ForeignKey is a helper that returns a primitive.TypedID from the given type and id
-func ForeignKey(typ, id string) primitive.TypedID {
-	return primitive.ForeignKey(typ, id)
 }
 
 // ExportJSON exports the graph as a json blob into the io Writer
