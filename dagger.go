@@ -107,6 +107,12 @@ func DelEdge(id primitive.TypedID) {
 	globalGraph.DelEdge(id)
 }
 
+
+// HasEdge returns true if an edge with the typed ID exists in the graph
+func HasEdge(id primitive.TypedID) bool {
+	return globalGraph.HasEdge(id)
+}
+
 // Close closes the global graph instance
 func Close() {
 	globalGraph.Close()
