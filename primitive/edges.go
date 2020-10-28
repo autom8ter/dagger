@@ -13,12 +13,22 @@ func (e edgeMap) Types() []string {
 
 // RangeType executes the function over a list of edges with the given type. If the function returns false, the iteration stops.
 func (e edgeMap) RangeType(typ Type, fn func(e *Edge) bool) {
-	if e[typ.Type()] == nil {
-		return
-	}
-	for _, e := range e[typ.Type()] {
-		if !fn(e) {
-			break
+	if typ.Type() == AnyType {
+		for _, edges := range e {
+			for _, edge := range edges {
+				if !fn(edge) {
+					break
+				}
+			}
+		}
+	} else {
+		if e[typ.Type()] == nil {
+			return
+		}
+		for _, e := range e[typ.Type()] {
+			if !fn(e) {
+				break
+			}
 		}
 	}
 }
@@ -50,14 +60,12 @@ func (e edgeMap) Filter(fn func(e *Edge) bool) []*Edge {
 // FilterType executes the function over every edge of the given type. If the function returns true, the edges will be added to the returned array of edges.
 func (e edgeMap) FilterType(typ Type, fn func(e *Edge) bool) []*Edge {
 	var edges []*Edge
-	if e[typ.Type()] == nil {
-		return edges
-	}
-	for _, e := range e[typ.Type()] {
+	e.RangeType(typ, func(e *Edge) bool {
 		if fn(e) {
 			edges = append(edges, e)
 		}
-	}
+		return true
+	})
 	return edges
 }
 

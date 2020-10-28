@@ -26,17 +26,6 @@ type Node struct {
 	primitive.TypedID
 }
 
-// EdgesFrom returns connections/edges that stem from the node/vertex
-func (n *Node) EdgesFrom(fn func(edge *Edge) bool) {
-	globalGraph.EdgesFrom(n, func(e *primitive.Edge) bool {
-		this, err := edgeFrom(e)
-		if err != nil {
-			panic(err)
-		}
-		return fn(this)
-	})
-}
-
 func (n *Node) load() primitive.Node {
 	node, ok := globalGraph.GetNode(n)
 	if !ok {
@@ -46,9 +35,20 @@ func (n *Node) load() primitive.Node {
 	return node
 }
 
+// EdgesFrom returns connections/edges that stem from the node/vertex
+func (n *Node) EdgesFrom(edgeType primitive.Type, fn func(edge *Edge) bool) {
+	globalGraph.EdgesFrom(edgeType, n, func(e *primitive.Edge) bool {
+		this, err := edgeFrom(e)
+		if err != nil {
+			panic(err)
+		}
+		return fn(this)
+	})
+}
+
 // EdgesTo returns connections/edges that point toward the node/vertex
-func (n *Node) EdgesTo(fn func(e *Edge) bool) {
-	globalGraph.EdgesTo(n, func(e *primitive.Edge) bool {
+func (n *Node) EdgesTo(edgeType primitive.Type, fn func(e *Edge) bool) {
+	globalGraph.EdgesTo(edgeType, n, func(e *primitive.Edge) bool {
 		this, err := edgeFrom(e)
 		if err != nil {
 			panic(err)
@@ -150,4 +150,28 @@ func (n *Node) FromJSON(bits []byte) error {
 // Raw returns the underlying map[string]interface{}. The map should be treated as readonly.
 func (n *Node) Raw() map[string]interface{} {
 	return n.load()
+}
+
+// FilterEdgesFrom returns an array of edges that point from the node that pass the filter
+func (n *Node) FilterEdgesFrom(edgeType primitive.Type, filter func(e *Edge) bool) []*Edge {
+	var edges []*Edge
+	n.EdgesFrom(edgeType, func(e *Edge) bool {
+		if filter(e) {
+			edges = append(edges, e)
+		}
+		return true
+	})
+	return edges
+}
+
+// FilterEdgesTo returns an array of edges that point to the node that pass the filter
+func (n *Node) FilterEdgesTo(edgeType primitive.Type, filter func(e *Edge) bool) []*Edge {
+	var edges []*Edge
+	n.EdgesTo(edgeType, func(e *Edge) bool {
+		if filter(e) {
+			edges = append(edges, e)
+		}
+		return true
+	})
+	return edges
 }

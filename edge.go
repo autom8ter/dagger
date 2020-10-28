@@ -5,6 +5,7 @@ import (
 	"github.com/autom8ter/dagger/primitive"
 )
 
+// Edge is an edge in the directed graph. It represents a relationship between two nodes.
 type Edge struct {
 	primitive.TypedID
 }

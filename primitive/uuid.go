@@ -6,7 +6,7 @@ import (
 	"log"
 )
 
-func uuid() string {
+func UUID() string {
 	b := make([]byte, 16)
 	_, err := rand.Read(b)
 	if err != nil {

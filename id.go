@@ -1,18 +1,63 @@
 package dagger
 
-import "github.com/autom8ter/dagger/primitive"
+import (
+	"fmt"
+	"github.com/autom8ter/dagger/primitive"
+)
 
-// ForeignKey is a helper that returns a primitive.TypedID from the given type and id
-func ForeignKey(typ, id string) primitive.TypedID {
-	return primitive.ForeignKey(typ, id)
+// ForeignKey satisfies primitive.TypedID interface
+type ForeignKey struct {
+	XID   string
+	XType string
 }
 
-// StringID returns a primitive.ID implemenation that is just the input string
+func (f *ForeignKey) ID() string {
+	return f.XID
+}
+
+func (f *ForeignKey) Type() string {
+	return f.XType
+}
+
+func (f *ForeignKey) Path() string {
+	return fmt.Sprintf("%s.%s", f.Type(), f.ID())
+}
+
+type stringFunc func() string
+
+func (s stringFunc) ID() string {
+	return s()
+}
+func (s stringFunc) Type() string {
+	return s()
+}
+
 func StringID(id string) primitive.ID {
-	return primitive.StringID(id)
+	return stringFunc(func() string {
+		return id
+	})
 }
 
-// StringType returns a primitive.Type implemenation that is just the input string
+func RandomID() primitive.ID {
+	return stringFunc(func() string {
+		return primitive.UUID()
+	})
+}
+
+func AnyType() primitive.Type {
+	return stringFunc(func() string {
+		return primitive.AnyType
+	})
+}
+
+func DefaultType() primitive.Type {
+	return stringFunc(func() string {
+		return primitive.DefaultType
+	})
+}
+
 func StringType(typ string) primitive.Type {
-	return primitive.StringType(typ)
+	return stringFunc(func() string {
+		return typ
+	})
 }

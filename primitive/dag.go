@@ -34,7 +34,7 @@ func (g *Graph) NodeTypes() []string {
 
 func (g *Graph) AddNode(n Node) {
 	if n.ID() == "" {
-		n.SetID(uuid())
+		n.SetID(UUID())
 	}
 	g.nodes.Set(n.Type(), n.ID(), n)
 }
@@ -127,7 +127,7 @@ func (g *Graph) DelNode(id TypedID) {
 
 func (g *Graph) AddEdge(e *Edge) error {
 	if e.ID() == "" {
-		e.SetID(uuid())
+		e.SetID(UUID())
 	}
 	if err := e.Validate(); err != nil {
 		return err
@@ -205,22 +205,22 @@ func (g *Graph) DelEdge(id TypedID) {
 	g.edges.Delete(id.Type(), id.ID())
 }
 
-func (g *Graph) EdgesFrom(id TypedID, fn func(e *Edge) bool) {
+func (g *Graph) EdgesFrom(edgeType Type, id TypedID, fn func(e *Edge) bool) {
 	val, ok := g.edgesFrom.Get(id.Type(), id.ID())
 	if ok {
 		if edges, ok := val.(edgeMap); ok {
-			edges.Range(func(e *Edge) bool {
+			edges.RangeType(edgeType, func(e *Edge) bool {
 				return fn(e)
 			})
 		}
 	}
 }
 
-func (g *Graph) EdgesTo(id TypedID, fn func(e *Edge) bool) {
+func (g *Graph) EdgesTo(edgeType Type, id TypedID, fn func(e *Edge) bool) {
 	val, ok := g.edgesTo.Get(id.Type(), id.ID())
 	if ok {
 		if edges, ok := val.(edgeMap); ok {
-			edges.Range(func(e *Edge) bool {
+			edges.RangeType(edgeType, func(e *Edge) bool {
 				return fn(e)
 			})
 		}

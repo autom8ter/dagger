@@ -77,9 +77,9 @@ dagger is a blazing fast, concurrency safe, mutable, in-memory directed graph im
    	if charlie.GetInt("weight") != 19 {
    		exit("expected charlie's weight to be 19!")
    	}
-   	// check to make sure edge is patched
-   	coleman.EdgesFrom(func(e *dagger.Edge) bool {
-   		if e.Type() == "pet" && e.GetString("name") == "charlie" {
+   // check to make sure edge is patched
+   	coleman.EdgesFrom(dagger.AnyType(), func(e *dagger.Edge) bool {
+   		if e.Type() == "pet" {
    			if e.To().GetInt("weight") != 19 {
    				exit("failed to patch charlie's weight")
    			}
@@ -96,43 +96,17 @@ dagger is a blazing fast, concurrency safe, mutable, in-memory directed graph im
    		exit("failed to delete node - (charlie)")
    	}
    	// check to make sure edge no longer exists(cascade)
-   	coleman.EdgesFrom(func(e *dagger.Edge) bool {
+   	coleman.EdgesFrom(dagger.AnyType(), func(e *dagger.Edge) bool {
    		if e.Type() == "pet" && e.GetString("name") == "charlie" {
    			exit("failed to delete node - (charlie)")
    		}
    		return true
    	})
    	// check to make sure edge no longer exists(cascade)
-   	lacee.EdgesFrom(func(e *dagger.Edge) bool {
+   	lacee.EdgesFrom(dagger.AnyType(), func(e *dagger.Edge) bool {
    		if e.Type() == "pet" && e.GetString("name") == "charlie" {
    			exit("failed to delete node - (charlie)")
    		}
-   		return true
-   	})
-   	fmt.Printf("registered node types = %v", dagger.NodeTypes())
-   	fmt.Printf("registered edge types = %v", dagger.EdgeTypes())
-   	dagger.RangeNodes(func(n *dagger.Node) bool {
-   		bits, err := n.JSON()
-   		if err != nil {
-   			exitErr(err)
-   		}
-   		fmt.Printf("\nfound node = %v\n", string(bits))
-   		n.EdgesFrom(func(e *dagger.Edge) bool {
-   			bits, err := e.JSON()
-   			if err != nil {
-   				exitErr(err)
-   			}
-   			fmt.Println(string(bits))
-   			return true
-   		})
-   		n.EdgesTo(func(e *dagger.Edge) bool {
-   			bits, err := e.JSON()
-   			if err != nil {
-   				exitErr(err)
-   			}
-   			fmt.Println(string(bits))
-   			return true
-   		})
    		return true
    	})
 

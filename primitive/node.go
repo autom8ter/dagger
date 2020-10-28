@@ -18,7 +18,7 @@ type Node map[string]interface{}
 func NewNode(nodeType, id string) Node {
 	if id == "" {
 		return map[string]interface{}{
-			ID_KEY:   uuid(),
+			ID_KEY:   UUID(),
 			TYPE_KEY: nodeType,
 		}
 	}

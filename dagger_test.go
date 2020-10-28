@@ -63,7 +63,7 @@ func seedT(t *testing.T) {
 		t.Fatal("expected charlie's weight to be 19!")
 	}
 	// check to make sure edge is patched
-	coleman.EdgesFrom(func(e *dagger.Edge) bool {
+	coleman.EdgesFrom(dagger.AnyType(), func(e *dagger.Edge) bool {
 		if e.Type() == "pet" && e.GetString("name") == "charlie" {
 			if e.To().GetInt("weight") != 19 {
 				t.Fatal("failed to patch charlie's weight")
@@ -78,14 +78,14 @@ func seedT(t *testing.T) {
 		t.Fatal("failed to delete node - (charlie)")
 	}
 	// check to make sure edge no longer exists(cascade)
-	coleman.EdgesFrom(func(e *dagger.Edge) bool {
+	coleman.EdgesFrom(dagger.AnyType(), func(e *dagger.Edge) bool {
 		if e.Type() == "pet" && e.GetString("name") == "charlie" {
 			t.Fatal("failed to delete node - (charlie)")
 		}
 		return true
 	})
 	// check to make sure edge no longer exists(cascade)
-	lacee.EdgesFrom(func(e *dagger.Edge) bool {
+	lacee.EdgesFrom(dagger.AnyType(), func(e *dagger.Edge) bool {
 		if e.Type() == "pet" && e.GetString("name") == "charlie" {
 			t.Fatal("failed to delete node - (charlie)")
 		}
@@ -121,7 +121,7 @@ func seedB(t *testing.B) {
 	charlie.Patch(map[string]interface{}{
 		"weight": 19,
 	})
-	coleman.EdgesFrom(func(e *dagger.Edge) bool {
+	coleman.EdgesFrom(dagger.AnyType(), func(e *dagger.Edge) bool {
 		if e.Type() == "pet" && e.GetString("name") == "charlie" {
 			if e.To().GetInt("weight") != 19 {
 				t.Fatal("failed to patch charlie's weight")
@@ -141,7 +141,7 @@ func Test(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Log(string(bits))
-		n.EdgesFrom(func(e *dagger.Edge) bool {
+		n.EdgesFrom(dagger.AnyType(), func(e *dagger.Edge) bool {
 			bits, err := e.JSON()
 			if err != nil {
 				t.Fatal(err)
@@ -149,7 +149,7 @@ func Test(t *testing.T) {
 			t.Log(string(bits))
 			return true
 		})
-		n.EdgesTo(func(e *dagger.Edge) bool {
+		n.EdgesTo(dagger.AnyType(), func(e *dagger.Edge) bool {
 			bits, err := e.JSON()
 			if err != nil {
 				t.Fatal(err)
@@ -174,12 +174,12 @@ func Benchmark(t *testing.B) {
 		dagger.RangeNodes(func(n *dagger.Node) bool {
 			nodes++
 			t.Logf("nodes(%v)", nodes)
-			n.EdgesFrom(func(e *dagger.Edge) bool {
+			n.EdgesFrom(dagger.AnyType(), func(e *dagger.Edge) bool {
 				edgesFrom++
 				t.Logf("edgesFrom(%v)", edgesFrom)
 				return true
 			})
-			n.EdgesTo(func(e *dagger.Edge) bool {
+			n.EdgesTo(dagger.AnyType(), func(e *dagger.Edge) bool {
 				edgesTo++
 				t.Logf("edgesTo(%v)", edgesTo)
 				return true
@@ -222,7 +222,10 @@ func TestExportJSON(t *testing.T) {
 			t.Logf("%s.%s", n.Type(), n.ID())
 			return true
 		})
-		if !dagger.HasNode(dagger.ForeignKey("user", "cword")) {
+		if !dagger.HasNode(&dagger.ForeignKey{
+			XID:   "cword",
+			XType: "user",
+		}) {
 			t.Fatal("import failed")
 		}
 	}
