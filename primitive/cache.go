@@ -62,9 +62,16 @@ func (n *namespacedCache) Set(namespace string, key interface{}, value interface
 func (n *namespacedCache) Range(namespace string, f func(key string, value interface{}) bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	if c, ok := n.cacheMap[namespace]; ok {
-		c.Range(f)
+	if namespace == AnyType {
+		for _, c := range n.cacheMap {
+			c.Range(f)
+		}
+	} else {
+		if c, ok := n.cacheMap[namespace]; ok {
+			c.Range(f)
+		}
 	}
+
 }
 
 func (n *namespacedCache) Delete(namespace string, key interface{}) {
