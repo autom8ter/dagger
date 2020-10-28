@@ -10,17 +10,9 @@ type Edge struct {
 	primitive.TypedID
 }
 
-// NewNode creates a new node in the global, in-memory graph.
-// If an id is not provided, a random uuid will be assigned.
-func NewEdge(edgeType, id string, attributes map[string]interface{}, from, to *Node) (*Edge, error) {
-	data := primitive.NewNode(edgeType, id)
-	data.SetAll(attributes)
-	n := nodeFrom(data)
-	return edgeFrom(&primitive.Edge{
-		Node: n.load(),
-		From: from.load(),
-		To:   to.load(),
-	})
+// NewEdge creates a new edge node in the global, in-memory graph.
+func NewEdge(relationship string, from, to *Node, mutual bool) (*Edge, error) {
+	return from.Connect(to, relationship, mutual)
 }
 
 func edgeFrom(edge *primitive.Edge) (*Edge, error) {

@@ -15,17 +15,17 @@ const (
 // Node is a functional hash table for storing arbitrary data. It is not concurrency safe
 type Node map[string]interface{}
 
-func NewNode(nodeType, id string) Node {
-	if id == "" {
-		return map[string]interface{}{
-			ID_KEY:   UUID(),
-			TYPE_KEY: nodeType,
-		}
+func NewNode(attributes map[string]interface{}) Node {
+	if attributes == nil {
+		attributes = map[string]interface{}{}
 	}
-	return map[string]interface{}{
-		ID_KEY:   id,
-		TYPE_KEY: nodeType,
+	if attributes[ID_KEY] == "" {
+		attributes[ID_KEY] = UUID()
 	}
+	if attributes[TYPE_KEY] == "" {
+		attributes[TYPE_KEY] = DefaultType
+	}
+	return attributes
 }
 
 func (n Node) Type() string {

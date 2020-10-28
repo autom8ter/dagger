@@ -1,14 +1,15 @@
 package dagger
 
 import (
+	"errors"
 	"fmt"
 	"github.com/autom8ter/dagger/primitive"
 )
 
 // NewNode creates a new node in the global, in-memory graph.
 // If an id is not provided, a random uuid will be assigned.
-func NewNode(nodeType, id string, attributes map[string]interface{}) *Node {
-	data := primitive.NewNode(nodeType, id)
+func NewNode(attributes map[string]interface{}) *Node {
+	data := primitive.NewNode(attributes)
 	data.SetAll(attributes)
 	return nodeFrom(data)
 }
@@ -26,10 +27,17 @@ type Node struct {
 	primitive.TypedID
 }
 
+func (n *Node) attributes() map[string]interface{} {
+	return map[string]interface{}{
+		primitive.TYPE_KEY: n.Type(),
+		primitive.ID_KEY:   n.ID(),
+	}
+}
+
 func (n *Node) load() primitive.Node {
 	node, ok := globalGraph.GetNode(n)
 	if !ok {
-		globalGraph.AddNode(primitive.NewNode(n.Type(), n.ID()))
+		globalGraph.AddNode(primitive.NewNode(n.attributes()))
 		node, ok = globalGraph.GetNode(n)
 	}
 	return node
@@ -64,33 +72,42 @@ func (n *Node) Remove() {
 
 // Connect creates a connection/edge between the two nodes with the given relationship type
 // if mutual = true, the connection is doubly linked - (facebook is mutual, instagram is not)
-func (n *Node) Connect(nodeID primitive.TypedID, relationship string, mutual bool) error {
+func (n *Node) Connect(nodeID primitive.TypedID, relationship string, mutual bool) (*Edge, error) {
+	en := primitive.NewNode(map[string]interface{}{
+		primitive.TYPE_KEY: relationship,
+	})
 	node, ok := GetNode(nodeID)
 	if !ok {
-		return fmt.Errorf("node: %s %s does not exist", nodeID.Type(), nodeID.ID())
+		return nil, fmt.Errorf("node: %s %s does not exist", nodeID.Type(), nodeID.ID())
 	}
 	if !mutual {
-		return globalGraph.AddEdge(&primitive.Edge{
-			Node: primitive.NewNode(relationship, ""),
+		if err := globalGraph.AddEdge(&primitive.Edge{
+			Node: en,
 			From: n.load(),
 			To:   node.load(),
-		})
+		}); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := globalGraph.AddEdge(&primitive.Edge{
+			Node: en,
+			From: n.load(),
+			To:   node.load(),
+		}); err != nil {
+			return nil, err
+		}
+		if err := globalGraph.AddEdge(&primitive.Edge{
+			Node: en,
+			From: node.load(),
+			To:   n.load(),
+		}); err != nil {
+			return nil, err
+		}
 	}
-	if err := globalGraph.AddEdge(&primitive.Edge{
-		Node: primitive.NewNode(relationship, ""),
-		From: n.load(),
-		To:   node.load(),
-	}); err != nil {
-		return err
+	if !ok {
+		return nil, errors.New("failed to created edge")
 	}
-	if err := globalGraph.AddEdge(&primitive.Edge{
-		Node: primitive.NewNode(relationship, ""),
-		From: node.load(),
-		To:   n.load(),
-	}); err != nil {
-		return err
-	}
-	return nil
+	return &Edge{en}, nil
 }
 
 // Patch patches the node attributes with the given data

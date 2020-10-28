@@ -1,28 +1,30 @@
 package dagger_test
 
 import (
-	"fmt"
 	"github.com/autom8ter/dagger"
 	"os"
 	"testing"
-	"time"
 )
 
 var (
-	coleman = dagger.NewNode("user", fmt.Sprintf("cword_%v", time.Now().UnixNano()), map[string]interface{}{
-		"name": "coleman",
+	coleman = dagger.NewNode(map[string]interface{}{
+		"_type": "user",
+		"name":  "coleman",
 	})
-	tyler = dagger.NewNode("user", fmt.Sprintf("twash_%v", time.Now().UnixNano()), map[string]interface{}{
-		"name": "tyler",
+	tyler = dagger.NewNode(map[string]interface{}{
+		"_type": "user",
+		"name":  "coleman",
 	})
-	sarah = dagger.NewNode("user", fmt.Sprintf("swash_%v", time.Now().UnixNano()), map[string]interface{}{
-		"name": "sarah",
+	sarah = dagger.NewNode(map[string]interface{}{
+		"_type": "user",
+		"name":  "sarah",
 	})
-	lacee = dagger.NewNode("user", fmt.Sprintf("ljans_%v", time.Now().UnixNano()), map[string]interface{}{
-		"name": "lacee",
+	lacee = dagger.NewNode(map[string]interface{}{
+		"_type": "user",
+		"name":  "lacee",
 	})
-	// random id will be generated if one isn't provided
-	charlie = dagger.NewNode("dog", "", map[string]interface{}{
+	charlie = dagger.NewNode(map[string]interface{}{
+		"_type":  "dog",
 		"name":   "charlie",
 		"weight": 25,
 	})
@@ -32,28 +34,28 @@ func seedT(t *testing.T) {
 	if coleman.GetString("name") != "coleman" {
 		exit("expected name to be coleman")
 	}
-	if err := coleman.Connect(tyler, "friend", true); err != nil {
+	if _, err := coleman.Connect(tyler, "friend", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := sarah.Connect(lacee, "friend", true); err != nil {
+	if _, err := sarah.Connect(lacee, "friend", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := coleman.Connect(lacee, "fiance", true); err != nil {
+	if _, err := coleman.Connect(lacee, "fiance", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := tyler.Connect(sarah, "wife", true); err != nil {
+	if _, err := tyler.Connect(sarah, "wife", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := coleman.Connect(charlie, "pet", false); err != nil {
+	if _, err := coleman.Connect(charlie, "pet", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := lacee.Connect(charlie, "pet", false); err != nil {
+	if _, err := lacee.Connect(charlie, "pet", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := charlie.Connect(lacee, "owner", false); err != nil {
+	if _, err := charlie.Connect(lacee, "owner", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := charlie.Connect(coleman, "owner", false); err != nil {
+	if _, err := charlie.Connect(coleman, "owner", false); err != nil {
 		t.Fatal(err)
 	}
 	charlie.Patch(map[string]interface{}{
@@ -94,28 +96,28 @@ func seedT(t *testing.T) {
 }
 
 func seedB(t *testing.B) {
-	if err := coleman.Connect(tyler, "friend", true); err != nil {
+	if _, err := coleman.Connect(tyler, "friend", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := sarah.Connect(lacee, "friend", true); err != nil {
+	if _, err := sarah.Connect(lacee, "friend", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := coleman.Connect(lacee, "fiance", true); err != nil {
+	if _, err := coleman.Connect(lacee, "fiance", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := tyler.Connect(sarah, "wife", true); err != nil {
+	if _, err := tyler.Connect(sarah, "wife", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := coleman.Connect(charlie, "pet", false); err != nil {
+	if _, err := coleman.Connect(charlie, "pet", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := lacee.Connect(charlie, "pet", false); err != nil {
+	if _, err := lacee.Connect(charlie, "pet", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := charlie.Connect(lacee, "owner", false); err != nil {
+	if _, err := charlie.Connect(lacee, "owner", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := charlie.Connect(coleman, "owner", false); err != nil {
+	if _, err := charlie.Connect(coleman, "owner", false); err != nil {
 		t.Fatal(err)
 	}
 	charlie.Patch(map[string]interface{}{
@@ -195,7 +197,10 @@ func Benchmark(t *testing.B) {
 
 func TestExportJSON(t *testing.T) {
 	os.Remove("testing.json")
-	_ = dagger.NewNode("user", "cword", nil)
+	_ = dagger.NewNode(map[string]interface{}{
+		"_type": "user",
+		"_id":   "cword",
+	})
 	{
 		f, err := os.Create("testing.json")
 		if err != nil {
