@@ -47,13 +47,22 @@ func NodeTypes() []string {
 	return nodeTypes
 }
 
-// GetNode gets a node from the graph
+// GetNode gets a node from the graph if it exists
 func GetNode(id primitive.TypedID) (*Node, bool) {
 	n, ok := globalGraph.GetNode(id)
 	if !ok {
 		return nil, false
 	}
 	return &Node{n}, true
+}
+
+// GetEdge gets an edge from the graph if it exists
+func GetEdge(id primitive.TypedID) (*Edge, bool) {
+	n, ok := globalGraph.GetEdge(id)
+	if !ok {
+		return nil, false
+	}
+	return &Edge{n}, true
 }
 
 // RangeNodeTypes iterates over nodes of a given type until the iterator returns false
