@@ -48,7 +48,7 @@ func (n *Node) EdgesFrom(edgeType primitive.Type, fn func(edge *Edge) bool) {
 	globalGraph.EdgesFrom(edgeType, n, func(e *primitive.Edge) bool {
 		this, err := edgeFrom(e)
 		if err != nil {
-			panic(err)
+			return true
 		}
 		return fn(this)
 	})
@@ -59,7 +59,7 @@ func (n *Node) EdgesTo(edgeType primitive.Type, fn func(e *Edge) bool) {
 	globalGraph.EdgesTo(edgeType, n, func(e *primitive.Edge) bool {
 		this, err := edgeFrom(e)
 		if err != nil {
-			panic(err)
+			return true
 		}
 		return fn(this)
 	})

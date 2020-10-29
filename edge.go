@@ -1,7 +1,6 @@
 package dagger
 
 import (
-	"fmt"
 	"github.com/autom8ter/dagger/primitive"
 )
 
@@ -28,7 +27,11 @@ func edgeFrom(edge *primitive.Edge) (*Edge, error) {
 func (e *Edge) load() *primitive.Edge {
 	edge, ok := globalGraph.GetEdge(e)
 	if !ok {
-		panic(fmt.Sprintf("invalid edge: %s %s", e.TypedID.Type(), e.TypedID.ID()))
+		return &primitive.Edge{
+			Node: primitive.Node{},
+			From: primitive.Node{},
+			To:   primitive.Node{},
+		}
 	}
 	return edge
 }

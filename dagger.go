@@ -84,7 +84,7 @@ func RangeEdges(fn func(e *Edge) bool) {
 	globalGraph.RangeEdges(func(e *primitive.Edge) bool {
 		this, err := edgeFrom(e)
 		if err != nil {
-			panic(err)
+			return true
 		}
 		return fn(this)
 	})
@@ -95,7 +95,7 @@ func RangeEdgeTypes(edgeType primitive.Type, fn func(e *Edge) bool) {
 	globalGraph.RangeEdgeTypes(edgeType, func(e *primitive.Edge) bool {
 		this, err := edgeFrom(e)
 		if err != nil {
-			panic(err)
+			return true
 		}
 		return fn(this)
 	})
