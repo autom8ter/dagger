@@ -1,13 +1,13 @@
-package primitive
+package dagger
 
 import (
 	"fmt"
-	"sync"
+	"github.com/autom8ter/dagger/ds"
+	"github.com/autom8ter/dagger/util"
 )
 
 // Graph is a concurrency safe, mutable, in-memory directed graph
 type Graph struct {
-	mu        sync.RWMutex
 	nodes     *namespacedCache
 	edges     *namespacedCache
 	edgesFrom *namespacedCache
@@ -16,7 +16,6 @@ type Graph struct {
 
 func NewGraph() *Graph {
 	return &Graph{
-		mu:        sync.RWMutex{},
 		nodes:     newCache(),
 		edges:     newCache(),
 		edgesFrom: newCache(),
@@ -32,18 +31,18 @@ func (g *Graph) NodeTypes() []string {
 	return g.nodes.Namespaces()
 }
 
-func (g *Graph) AddNode(n Node) {
-	if n.ID() == "" {
-		n.SetID(UUID())
+func (g *Graph) SetNode(key ForeignKey, attr Attributes) Node {
+	if key.ID() == "" {
+		key.SetID(util.UUID())
 	}
-	g.nodes.Set(n.Type(), n.ID(), n)
+	n := Node{
+		ForeignKey: key,
+		Attributes: attr,
+	}
+	g.nodes.Set(key.Type(), key.ID(), n)
+	return n
 }
 
-func (g *Graph) AddNodes(nodes ...Node) {
-	for _, n := range nodes {
-		g.AddNode(n)
-	}
-}
 func (g *Graph) GetNode(id TypedID) (Node, bool) {
 	val, ok := g.nodes.Get(id.Type(), id.ID())
 	if ok {
@@ -52,7 +51,7 @@ func (g *Graph) GetNode(id TypedID) (Node, bool) {
 			return n, true
 		}
 	}
-	return nil, false
+	return Node{}, false
 }
 
 func (g *Graph) RangeNodeTypes(typ Type, fn func(n Node) bool) {
@@ -81,10 +80,10 @@ func (g *Graph) RangeNodes(fn func(n Node) bool) {
 	}
 }
 
-func (g *Graph) RangeEdges(fn func(e *Edge) bool) {
+func (g *Graph) RangeEdges(fn func(e Edge) bool) {
 	for _, namespace := range g.edges.Namespaces() {
 		g.edges.Range(namespace, func(key string, val interface{}) bool {
-			e, ok := val.(*Edge)
+			e, ok := val.(Edge)
 			if ok {
 				if !fn(e) {
 					return false
@@ -95,9 +94,9 @@ func (g *Graph) RangeEdges(fn func(e *Edge) bool) {
 	}
 }
 
-func (g *Graph) RangeEdgeTypes(edgeType Type, fn func(e *Edge) bool) {
+func (g *Graph) RangeEdgeTypes(edgeType Type, fn func(e Edge) bool) {
 	g.edges.Range(edgeType.Type(), func(key string, val interface{}) bool {
-		e, ok := val.(*Edge)
+		e, ok := val.(Edge)
 		if ok {
 			if !fn(e) {
 				return false
@@ -116,7 +115,7 @@ func (g *Graph) DelNode(id TypedID) {
 	if val, ok := g.edgesFrom.Get(id.Type(), id.ID()); ok {
 		if val != nil {
 			edges := val.(edgeMap)
-			edges.Range(func(e *Edge) bool {
+			edges.Range(func(e Edge) bool {
 				g.DelEdge(e)
 				return true
 			})
@@ -125,48 +124,49 @@ func (g *Graph) DelNode(id TypedID) {
 	g.nodes.Delete(id.Type(), id.ID())
 }
 
-func (g *Graph) AddEdge(e *Edge) error {
-	if e.ID() == "" {
-		e.SetID(UUID())
+func (g *Graph) SetEdge(from, to TypedID, node Node) (Edge, error) {
+	fromNode, ok := g.GetNode(from)
+	if !ok {
+		return Edge{}, fmt.Errorf("node %s.%s does not exist", from.Type(), from.ID())
 	}
-	if err := e.Validate(); err != nil {
-		return err
+	toNode, ok := g.GetNode(to)
+	if !ok {
+		return Edge{}, fmt.Errorf("node %s.%s does not exist", to.Type(), to.ID())
 	}
-	if !g.HasNode(e.From) {
-		return fmt.Errorf("node %s.%s does not exist", e.From.Type(), e.From.ID())
+	if !node.ForeignKey.HasID() {
+		node.ForeignKey.SetID(util.UUID())
 	}
-	if !g.HasNode(e.To) {
-		return fmt.Errorf("node %s.%s does not exist", e.To.Type(), e.To.ID())
+	if !node.ForeignKey.HasType() {
+		node.ForeignKey.SetType(DefaultType)
 	}
-	g.edges.Set(e.Type(), e.ID(), e)
-	if val, ok := g.edgesFrom.Get(e.From.Type(), e.From.ID()); ok {
-		edges := val.(edgeMap)
-		edges.AddEdge(e)
-		g.edgesFrom.Set(e.From.Type(), e.From.ID(), edges)
-	} else {
-		edges := edgeMap{}
-		edges.AddEdge(e)
-		g.edgesFrom.Set(e.From.Type(), e.From.ID(), edges)
-	}
-	if val, ok := g.edgesTo.Get(e.To.Type(), e.To.ID()); ok {
-		edges := val.(edgeMap)
-		edges.AddEdge(e)
-		g.edgesTo.Set(e.To.Type(), e.To.ID(), edges)
-	} else {
-		edges := edgeMap{}
-		edges.AddEdge(e)
-		g.edgesTo.Set(e.To.Type(), e.To.ID(), edges)
-	}
-	return nil
-}
 
-func (g *Graph) AddEdges(edges ...*Edge) error {
-	for _, e := range edges {
-		if err := g.AddEdge(e); err != nil {
-			return err
-		}
+	e := Edge{
+		Node: node,
+		From: fromNode,
+		To:   toNode,
 	}
-	return nil
+
+	g.edges.Set(e.ForeignKey.Type(), e.ForeignKey.ID(), e)
+
+	if val, ok := g.edgesFrom.Get(e.From.ForeignKey.Type(), e.From.ForeignKey.ID()); ok && val != nil {
+		edges := val.(edgeMap)
+		edges.AddEdge(e)
+		g.edgesFrom.Set(e.From.ForeignKey.Type(), e.From.ForeignKey.ID(), edges)
+	} else {
+		edges := edgeMap{}
+		edges.AddEdge(e)
+		g.edgesFrom.Set(e.From.ForeignKey.Type(), e.From.ForeignKey.ID(), edges)
+	}
+	if val, ok := g.edgesTo.Get(e.To.ForeignKey.Type(), e.To.ForeignKey.ID()); ok && val != nil {
+		edges := val.(edgeMap)
+		edges.AddEdge(e)
+		g.edgesTo.Set(e.To.ForeignKey.Type(), e.To.ForeignKey.ID(), edges)
+	} else {
+		edges := edgeMap{}
+		edges.AddEdge(e)
+		g.edgesTo.Set(e.To.ForeignKey.Type(), e.To.ForeignKey.ID(), edges)
+	}
+	return e, nil
 }
 
 func (g *Graph) HasEdge(id TypedID) bool {
@@ -174,53 +174,53 @@ func (g *Graph) HasEdge(id TypedID) bool {
 	return ok
 }
 
-func (g *Graph) GetEdge(id TypedID) (*Edge, bool) {
+func (g *Graph) GetEdge(id TypedID) (Edge, bool) {
 	val, ok := g.edges.Get(id.Type(), id.ID())
 	if ok {
-		e, ok := val.(*Edge)
+		e, ok := val.(Edge)
 		if ok {
 			return e, true
 		}
 	}
-	return nil, false
+	return Edge{}, false
 }
 
 func (g *Graph) DelEdge(id TypedID) {
 	val, ok := g.edges.Get(id.Type(), id.ID())
 	if ok && val != nil {
-		edge := val.(*Edge)
-		fromVal, ok := g.edgesFrom.Get(edge.From.Type(), edge.From.ID())
+		edge := val.(Edge)
+		fromVal, ok := g.edgesFrom.Get(edge.From.ForeignKey.Type(), edge.From.ForeignKey.ID())
 		if ok && fromVal != nil {
 			edges := fromVal.(edgeMap)
 			edges.DelEdge(id)
-			g.edgesFrom.Set(edge.From.Type(), edge.From.ID(), edges)
+			g.edgesFrom.Set(edge.From.ForeignKey.Type(), edge.From.ForeignKey.ID(), edges)
 		}
-		toVal, ok := g.edgesTo.Get(edge.To.Type(), edge.To.ID())
+		toVal, ok := g.edgesTo.Get(edge.To.ForeignKey.Type(), edge.To.ForeignKey.ID())
 		if ok && toVal != nil {
 			edges := toVal.(edgeMap)
 			edges.DelEdge(id)
-			g.edgesTo.Set(edge.To.Type(), edge.To.ID(), edges)
+			g.edgesTo.Set(edge.To.ForeignKey.Type(), edge.To.ForeignKey.ID(), edges)
 		}
 	}
 	g.edges.Delete(id.Type(), id.ID())
 }
 
-func (g *Graph) EdgesFrom(edgeType Type, id TypedID, fn func(e *Edge) bool) {
+func (g *Graph) EdgesFrom(edgeType string, id TypedID, fn func(e Edge) bool) {
 	val, ok := g.edgesFrom.Get(id.Type(), id.ID())
 	if ok {
 		if edges, ok := val.(edgeMap); ok {
-			edges.RangeType(edgeType, func(e *Edge) bool {
+			edges.RangeType(edgeType, func(e Edge) bool {
 				return fn(e)
 			})
 		}
 	}
 }
 
-func (g *Graph) EdgesTo(edgeType Type, id TypedID, fn func(e *Edge) bool) {
+func (g *Graph) EdgesTo(edgeType string, id TypedID, fn func(e Edge) bool) {
 	val, ok := g.edgesTo.Get(id.Type(), id.ID())
 	if ok {
 		if edges, ok := val.(edgeMap); ok {
-			edges.RangeType(edgeType, func(e *Edge) bool {
+			edges.RangeType(edgeType, func(e Edge) bool {
 				return fn(e)
 			})
 		}
@@ -233,7 +233,7 @@ func (g *Graph) Export() *Export {
 		exp.Nodes = append(exp.Nodes, n)
 		return true
 	})
-	g.RangeEdges(func(e *Edge) bool {
+	g.RangeEdges(func(e Edge) bool {
 		exp.Edges = append(exp.Edges, e)
 		return true
 	})
@@ -242,10 +242,12 @@ func (g *Graph) Export() *Export {
 
 func (g *Graph) Import(exp *Export) error {
 	for _, n := range exp.Nodes {
-		g.AddNode(n)
+		g.SetNode(n.ForeignKey, n.Attributes)
 	}
 	for _, e := range exp.Edges {
-		g.AddEdge(e)
+		if _, err := g.SetEdge(e.From, e.To, e.Node); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -256,3 +258,28 @@ func (g *Graph) Close() {
 	g.edgesFrom.Close()
 	g.edges.Close()
 }
+
+func (g *Graph) DFS(edgeType string, rootNode Node, fn func(node Node) bool) {
+	var visited = map[ForeignKey]struct{}{}
+	stack := ds.NewStack()
+	g.dfs(edgeType, rootNode, stack, visited)
+	stack.Range(func(element interface{}) bool {
+		node := element.(Node)
+		if node.XID == rootNode.XID && node.XType == rootNode.XType {
+			return true
+		}
+		return fn(element.(Node))
+	})
+}
+
+func (g *Graph) dfs(edgeType string, n Node, stack *ds.Stack, visited map[ForeignKey]struct{}) {
+	if _, ok := visited[n.ForeignKey]; !ok {
+		visited[n.ForeignKey] = struct{}{}
+		stack.Push(n)
+		g.EdgesFrom(edgeType, n, func(e Edge) bool {
+			g.dfs(edgeType, e.To, stack, visited)
+			return true
+		})
+	}
+}
+

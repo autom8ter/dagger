@@ -1,11 +1,11 @@
-package primitive
+package util
 
 import (
 	"fmt"
 	"strconv"
 )
 
-func parseInt(obj interface{}) int {
+func ParseInt(obj interface{}) int {
 	switch obj.(type) {
 	case string:
 		val, _ := strconv.Atoi(obj.(string))
@@ -25,7 +25,7 @@ func parseInt(obj interface{}) int {
 	}
 }
 
-func parseString(obj interface{}) string {
+func ParseString(obj interface{}) string {
 	switch obj.(type) {
 	case string:
 		return obj.(string)
@@ -34,7 +34,7 @@ func parseString(obj interface{}) string {
 	}
 }
 
-func parseBool(obj interface{}) bool {
+func ParseBool(obj interface{}) bool {
 	switch obj.(type) {
 	case bool:
 		return obj.(bool)

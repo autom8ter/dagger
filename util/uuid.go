@@ -1,4 +1,4 @@
-package primitive
+package util
 
 import (
 	"crypto/rand"

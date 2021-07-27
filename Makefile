@@ -8,7 +8,7 @@ help:
 	@echo "----------------------------------------------------------------"
 
 bench: ## run benchmarks
-	go test -v -race -bench=.
+	go test -v -race -bench BenchmarkDagger -run==
 
 test: ## run unit tests
 	go test -cover -v -coverprofile cover.out -race .
