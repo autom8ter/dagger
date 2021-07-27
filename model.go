@@ -3,57 +3,41 @@ package dagger
 import (
 	"encoding/json"
 	"errors"
+	"github.com/autom8ter/dagger/constants"
 	"github.com/autom8ter/dagger/util"
 )
 
-const DefaultType = "default"
-
-const AnyType = "*"
-
-type ID interface {
-	ID() string
-}
-
-type Type interface {
-	Type() string
-}
-
-type TypedID interface {
-	ID
-	Type
-}
-
-// ForeignKey satisfies primitive.TypedID interface
-type ForeignKey struct {
+// Path satisfies primitive.Path interface
+type Path struct {
 	XID   string `json:"xid"`
 	XType string `json:"xtype"`
 }
 
-func (n ForeignKey) HasID() bool {
+func (n Path) HasID() bool {
 	return n.XID != ""
 }
 
-func (n ForeignKey) HasType() bool {
+func (n Path) HasType() bool {
 	return n.XType != ""
 }
 
-func (n ForeignKey) SetID(id string) {
+func (n Path) SetID(id string) {
 	n.XID = id
 }
 
-func (n ForeignKey) SetType(typ string) {
+func (n Path) SetType(typ string) {
 	n.XType = typ
 }
 
-func (f ForeignKey) ID() string {
+func (f Path) ID() string {
 	return f.XID
 }
 
-func (f ForeignKey) Type() string {
+func (f Path) Type() string {
 	return f.XType
 }
 
-func (n ForeignKey) Validate() error {
+func (n Path) Validate() error {
 	if !n.HasID() {
 		return errors.New("dagger: missing node id")
 	}
@@ -65,31 +49,8 @@ func (n ForeignKey) Validate() error {
 
 // Node is a functional hash table for storing arbitrary data. It is not concurrency safe
 type Node struct {
-	ForeignKey
-	Attributes map[string]interface{}
-}
-
-func (v Node) JSON() ([]byte, error) {
-	return json.Marshal(v)
-}
-
-func (m Node) FromJSON(data []byte) error {
-	return json.Unmarshal(data, &m)
-}
-
-func (n2 Node) Read(p []byte) (n int, err error) {
-	bits, err := n2.JSON()
-	if err != nil {
-		return 0, err
-	}
-	return copy(p, bits), nil
-}
-
-func (n2 Node) Write(p []byte) (n int, err error) {
-	if err := n2.FromJSON(p); err != nil {
-		return 0, err
-	}
-	return len(p), nil
+	Path       `json:"path"`
+	Attributes Attributes `json:"attributes"`
 }
 
 type Attributes map[string]interface{}
@@ -190,9 +151,9 @@ type Edge struct {
 	// An edge implements Node because it has an Identifier and attributes
 	Node `json:"node"`
 	// From returns the root node of the edge
-	From Node `json:"from"`
+	From Path `json:"from"`
 	// To returns the target node of the edge
-	To Node `json:"to"`
+	To Path `json:"to"`
 }
 
 func (e Edge) JSON() ([]byte, error) {
@@ -212,7 +173,7 @@ func (e edgeMap) Types() []string {
 
 // RangeType executes the function over a list of edges with the given type. If the function returns false, the iteration stops.
 func (e edgeMap) RangeType(typ string, fn func(e Edge) bool) {
-	if typ == AnyType {
+	if typ == constants.AnyType {
 		for _, edges := range e {
 			for _, edge := range edges {
 				if !fn(edge) {
@@ -269,7 +230,7 @@ func (e edgeMap) FilterType(typ string, fn func(e Edge) bool) []Edge {
 }
 
 // DelEdge deletes the edge
-func (e edgeMap) DelEdge(id TypedID) {
+func (e edgeMap) DelEdge(id Path) {
 	if _, ok := e[id.Type()]; !ok {
 		return
 	}
@@ -278,23 +239,23 @@ func (e edgeMap) DelEdge(id TypedID) {
 
 // AddEdge adds the edge to the map
 func (e edgeMap) AddEdge(edge Edge) {
-	if _, ok := e[edge.ForeignKey.Type()]; !ok {
-		e[edge.ForeignKey.Type()] = map[string]Edge{
-			edge.ForeignKey.ID(): edge,
+	if _, ok := e[edge.Path.Type()]; !ok {
+		e[edge.Path.Type()] = map[string]Edge{
+			edge.Path.ID(): edge,
 		}
 	} else {
-		e[edge.ForeignKey.Type()][edge.ForeignKey.ID()] = edge
+		e[edge.Path.Type()][edge.Path.ID()] = edge
 	}
 }
 
 // HasEdge returns true if the edge exists
-func (e edgeMap) HasEdge(id TypedID) bool {
+func (e edgeMap) HasEdge(id Path) bool {
 	_, ok := e.GetEdge(id)
 	return ok
 }
 
 // GetEdge gets an edge by id
-func (e edgeMap) GetEdge(id TypedID) (Edge, bool) {
+func (e edgeMap) GetEdge(id Path) (Edge, bool) {
 	if _, ok := e[id.Type()]; !ok {
 		return Edge{}, false
 	}
@@ -305,8 +266,8 @@ func (e edgeMap) GetEdge(id TypedID) (Edge, bool) {
 }
 
 // Len returns the number of edges of the given type
-func (e edgeMap) Len(typ Type) int {
-	if rels, ok := e[typ.Type()]; ok {
+func (e edgeMap) Len(typ string) int {
+	if rels, ok := e[typ]; ok {
 		return len(rels)
 	}
 	return 0

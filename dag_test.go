@@ -9,26 +9,26 @@ import (
 func Test(t *testing.T) {
 	var g = dagger.NewGraph()
 
-	redis := g.SetNode(dagger.ForeignKey{
+	redis := g.SetNode(dagger.Path{
 		XID:   "redis",
 		XType: "infra",
 	}, map[string]interface{}{
 		"port": "6379",
 	})
-	mongo := g.SetNode(dagger.ForeignKey{
+	mongo := g.SetNode(dagger.Path{
 		XID:   "mongo",
 		XType: "infra",
 	}, map[string]interface{}{
 		"port": "5568",
 	})
-	httpServer := g.SetNode(dagger.ForeignKey{
+	httpServer := g.SetNode(dagger.Path{
 		XID:   "http",
 		XType: "infra",
 	}, map[string]interface{}{
 		"port": "8080",
 	})
-	_, err := g.SetEdge(httpServer, redis, dagger.Node{
-		ForeignKey: dagger.ForeignKey{
+	_, err := g.SetEdge(httpServer.Path, redis.Path, dagger.Node{
+		Path: dagger.Path{
 			XID:   redis.ID(),
 			XType: "depends_on",
 		},
@@ -37,8 +37,8 @@ func Test(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = g.SetEdge(httpServer, mongo, dagger.Node{
-		ForeignKey: dagger.ForeignKey{
+	_, err = g.SetEdge(httpServer.Path, mongo.Path, dagger.Node{
+		Path: dagger.Path{
 			XID:   mongo.ID(),
 			XType: "depends_on",
 		},
@@ -48,7 +48,7 @@ func Test(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g.DFS(dagger.AnyType, httpServer, func(node dagger.Node) bool {
+	g.DFS("*", httpServer.Path, func(node dagger.Node) bool {
 		bits, _ := json.MarshalIndent(&node, "", "    ")
 		t.Log(string(bits))
 		return true

@@ -1,11 +1,24 @@
-package dagger
+package ds
 
 import (
+	"github.com/autom8ter/dagger/constants"
 	"sort"
 	"sync"
 )
 
-func newCache() *namespacedCache {
+type NamespacedCache interface {
+	Len(namespace string) int
+	Namespaces() []string
+	Get(namespace string, key string) (interface{}, bool)
+	Set(namespace string, key string, value interface{})
+	Range(namespace string, f func(key string, value interface{}) bool)
+	Delete(namespace string, key string)
+	Exists(namespace string, key string) bool
+	Clear(namespace string)
+	Close()
+}
+
+func NewCache() NamespacedCache {
 	return &namespacedCache{
 		cacheMap:  map[string]map[string]interface{}{},
 		mu:        sync.RWMutex{},
@@ -60,7 +73,7 @@ func (n *namespacedCache) Set(namespace string, key string, value interface{}) {
 func (n *namespacedCache) Range(namespace string, f func(key string, value interface{}) bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	if namespace == AnyType {
+	if namespace == constants.AnyType {
 		for _, c := range n.cacheMap {
 			for k, v := range c {
 				f(k, v)
