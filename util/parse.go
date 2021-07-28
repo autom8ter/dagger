@@ -1,6 +1,7 @@
 package util
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 )
@@ -44,4 +45,9 @@ func ParseBool(obj interface{}) bool {
 	default:
 		return false
 	}
+}
+
+func JSONString(obj interface{}) string {
+	bits, _ := json.MarshalIndent(&obj, "", "    ")
+	return string(bits)
 }

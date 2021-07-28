@@ -15,6 +15,7 @@ type Graph struct {
 	edgesTo   ds.NamespacedCache
 }
 
+// NewGraph creates a new Graph instance
 func NewGraph() *Graph {
 	return &Graph{
 		nodes:     ds.NewCache(),
@@ -24,28 +25,41 @@ func NewGraph() *Graph {
 	}
 }
 
+// EdgeTypes returns all edge types in the graph
 func (g *Graph) EdgeTypes() []string {
 	return g.edges.Namespaces()
 }
 
+// EdgeTypes returns all node types in the graph
 func (g *Graph) NodeTypes() []string {
 	return g.nodes.Namespaces()
 }
 
+// SetNode sets a node in the graph
 func (g *Graph) SetNode(key Path, attr Attributes) Node {
-	if key.ID() == "" {
-		key.SetID(util.UUID())
+	if key.XID == "" {
+		key = Path{
+			XID:   util.UUID(),
+			XType: key.XType,
+		}
+	}
+	if key.XType == "" {
+		key = Path{
+			XID:   key.XID,
+			XType: constants.DefaultType,
+		}
 	}
 	n := Node{
 		Path:       key,
 		Attributes: attr,
 	}
-	g.nodes.Set(key.Type(), key.ID(), n)
+	g.nodes.Set(key.XType, key.XID, n)
 	return n
 }
 
+// GetNode gets an existing node in the graph
 func (g *Graph) GetNode(id Path) (Node, bool) {
-	val, ok := g.nodes.Get(id.Type(), id.ID())
+	val, ok := g.nodes.Get(id.XType, id.XID)
 	if ok {
 		n, ok := val.(Node)
 		if ok {
@@ -55,8 +69,9 @@ func (g *Graph) GetNode(id Path) (Node, bool) {
 	return Node{}, false
 }
 
-func (g *Graph) RangeNodeTypes(typ string, fn func(n Node) bool) {
-	g.nodes.Range(typ, func(key string, val interface{}) bool {
+// RangeNodes ranges over nodes of the given type until the given function returns false
+func (g *Graph) RangeNodes(nodeType string, fn func(n Node) bool) {
+	g.nodes.Range(nodeType, func(key string, val interface{}) bool {
 		n, ok := val.(Node)
 		if ok {
 			if !fn(n) {
@@ -67,35 +82,8 @@ func (g *Graph) RangeNodeTypes(typ string, fn func(n Node) bool) {
 	})
 }
 
-func (g *Graph) RangeNodes(fn func(n Node) bool) {
-	for _, namespace := range g.nodes.Namespaces() {
-		g.nodes.Range(namespace, func(key string, val interface{}) bool {
-			n, ok := val.(Node)
-			if ok {
-				if !fn(n) {
-					return false
-				}
-			}
-			return true
-		})
-	}
-}
-
-func (g *Graph) RangeEdges(fn func(e Edge) bool) {
-	for _, namespace := range g.edges.Namespaces() {
-		g.edges.Range(namespace, func(key string, val interface{}) bool {
-			e, ok := val.(Edge)
-			if ok {
-				if !fn(e) {
-					return false
-				}
-			}
-			return true
-		})
-	}
-}
-
-func (g *Graph) RangeEdgeTypes(edgeType string, fn func(e Edge) bool) {
+// RangeEdges ranges over edges until the given function returns false
+func (g *Graph) RangeEdges(edgeType string, fn func(e Edge) bool) {
 	g.edges.Range(edgeType, func(key string, val interface{}) bool {
 		e, ok := val.(Edge)
 		if ok {
@@ -113,59 +101,73 @@ func (g *Graph) HasNode(id Path) bool {
 }
 
 func (g *Graph) DelNode(id Path) {
-	if val, ok := g.edgesFrom.Get(id.Type(), id.ID()); ok {
+	if val, ok := g.edgesFrom.Get(id.XType, id.XID); ok {
 		if val != nil {
-			edges := val.(edgeMap)
-			edges.Range(func(e Edge) bool {
-				g.DelEdge(e.Path)
+			edges := val.(ds.NamespacedCache)
+			edges.Range("*", func(key string, val interface{}) bool {
+				g.DelEdge(val.(Edge).Path)
 				return true
 			})
 		}
 	}
-	g.nodes.Delete(id.Type(), id.ID())
+	if val, ok := g.edgesTo.Get(id.XType, id.XID); ok {
+		if val != nil {
+			edges := val.(ds.NamespacedCache)
+			edges.Range("*", func(key string, val interface{}) bool {
+				g.DelEdge(val.(Edge).Path)
+				return true
+			})
+		}
+	}
+	g.nodes.Delete(id.XType, id.XID)
 }
 
 func (g *Graph) SetEdge(from, to Path, node Node) (Edge, error) {
 	fromNode, ok := g.GetNode(from)
 	if !ok {
-		return Edge{}, fmt.Errorf("node %s.%s does not exist", from.Type(), from.ID())
+		return Edge{}, fmt.Errorf("node %s.%s does not exist", from.XType, from.XID)
 	}
 	toNode, ok := g.GetNode(to)
 	if !ok {
-		return Edge{}, fmt.Errorf("node %s.%s does not exist", to.Type(), to.ID())
+		return Edge{}, fmt.Errorf("node %s.%s does not exist", to.XType, to.XID)
 	}
-	if !node.Path.HasID() {
-		node.Path.SetID(util.UUID())
+	if node.Path.XID == "" {
+		node.Path = Path{
+			XID:   util.UUID(),
+			XType: node.Path.XType,
+		}
 	}
-	if !node.Path.HasType() {
-		node.Path.SetType(constants.DefaultType)
+	if node.Path.XType == "" {
+		node.Path = Path{
+			XID:   node.Path.XID,
+			XType: constants.DefaultType,
+		}
 	}
-
 	e := Edge{
 		Node: node,
 		From: fromNode.Path,
 		To:   toNode.Path,
 	}
 
-	g.edges.Set(e.Path.Type(), e.Path.ID(), e)
+	g.edges.Set(e.Path.XType, e.Path.XID, e)
 
-	if val, ok := g.edgesFrom.Get(e.From.Type(), e.From.ID()); ok && val != nil {
-		edges := val.(edgeMap)
-		edges.AddEdge(e)
-		g.edgesFrom.Set(e.From.Type(), e.From.ID(), edges)
+	if val, ok := g.edgesFrom.Get(e.From.XType, e.From.XID); ok && val != nil {
+		edges := val.(ds.NamespacedCache)
+		edges.Set(e.XType, e.XID, e)
+		g.edgesFrom.Set(e.From.XType, e.From.XID, edges)
 	} else {
-		edges := edgeMap{}
-		edges.AddEdge(e)
-		g.edgesFrom.Set(e.From.Type(), e.From.ID(), edges)
+		edges := ds.NewCache()
+		edges.Set(e.XType, e.XID, e)
+		g.edgesFrom.Set(e.From.XType, e.From.XID, edges)
 	}
-	if val, ok := g.edgesTo.Get(e.To.Type(), e.To.ID()); ok && val != nil {
-		edges := val.(edgeMap)
-		edges.AddEdge(e)
-		g.edgesTo.Set(e.To.Type(), e.To.ID(), edges)
+	if val, ok := g.edgesTo.Get(e.To.XType, e.To.XID); ok && val != nil {
+		edges := val.(ds.NamespacedCache)
+		edges.Set(e.XType, e.XID, e)
+		g.edgesTo.Set(e.To.XType, e.To.XID, edges)
 	} else {
-		edges := edgeMap{}
-		edges.AddEdge(e)
-		g.edgesTo.Set(e.To.Type(), e.To.ID(), edges)
+		edges := ds.NewCache()
+		edges.Set(e.XType, e.XID, e)
+		g.edgesTo.Set(e.To.XType, e.To.XID, edges)
 	}
 	return e, nil
 }
@@ -176,7 +178,7 @@ func (g *Graph) HasEdge(id Path) bool {
 }
 
 func (g *Graph) GetEdge(id Path) (Edge, bool) {
-	val, ok := g.edges.Get(id.Type(), id.ID())
+	val, ok := g.edges.Get(id.XType, id.XID)
 	if ok {
 		e, ok := val.(Edge)
 		if ok {
@@ -187,42 +189,42 @@ func (g *Graph) GetEdge(id Path) (Edge, bool) {
 }
 
 func (g *Graph) DelEdge(id Path) {
-	val, ok := g.edges.Get(id.Type(), id.ID())
+	val, ok := g.edges.Get(id.XType, id.XID)
 	if ok && val != nil {
 		edge := val.(Edge)
-		fromVal, ok := g.edgesFrom.Get(edge.From.Type(), edge.From.ID())
+		fromVal, ok := g.edgesFrom.Get(edge.From.XType, edge.From.XID)
 		if ok && fromVal != nil {
-			edges := fromVal.(edgeMap)
-			edges.DelEdge(id)
-			g.edgesFrom.Set(edge.From.Type(), edge.From.ID(), edges)
+			edges := fromVal.(ds.NamespacedCache)
+			edges.Delete(id.XType, id.XID)
+			g.edgesFrom.Set(edge.From.XType, edge.From.XID, edges)
 		}
-		toVal, ok := g.edgesTo.Get(edge.To.Type(), edge.To.ID())
+		toVal, ok := g.edgesTo.Get(edge.To.XType, edge.To.XID)
 		if ok && toVal != nil {
-			edges := toVal.(edgeMap)
-			edges.DelEdge(id)
-			g.edgesTo.Set(edge.To.Type(), edge.To.ID(), edges)
+			edges := toVal.(ds.NamespacedCache)
+			edges.Delete(id.XType, id.XID)
+			g.edgesTo.Set(edge.To.XType, edge.To.XID, edges)
 		}
 	}
-	g.edges.Delete(id.Type(), id.ID())
+	g.edges.Delete(id.XType, id.XID)
 }
 
-func (g *Graph) EdgesFrom(edgeType string, id Path, fn func(e Edge) bool) {
-	val, ok := g.edgesFrom.Get(id.Type(), id.ID())
+func (g *Graph) RangeEdgesFrom(edgeType string, id Path, fn func(e Edge) bool) {
+	val, ok := g.edgesFrom.Get(id.XType, id.XID)
 	if ok {
-		if edges, ok := val.(edgeMap); ok {
-			edges.RangeType(edgeType, func(e Edge) bool {
-				return fn(e)
+		if edges, ok := val.(ds.NamespacedCache); ok {
+			edges.Range(edgeType, func(key string, val interface{}) bool {
+				return fn(val.(Edge))
 			})
 		}
 	}
 }
 
-func (g *Graph) EdgesTo(edgeType string, id Path, fn func(e Edge) bool) {
-	val, ok := g.edgesTo.Get(id.Type(), id.ID())
+func (g *Graph) RangeEdgesTo(edgeType string, id Path, fn func(e Edge) bool) {
+	val, ok := g.edgesTo.Get(id.XType, id.XID)
 	if ok {
-		if edges, ok := val.(edgeMap); ok {
-			edges.RangeType(edgeType, func(e Edge) bool {
-				return fn(e)
+		if edges, ok := val.(ds.NamespacedCache); ok {
+			edges.Range(edgeType, func(key string, val interface{}) bool {
+				return fn(val.(Edge))
 			})
 		}
 	}
@@ -230,11 +232,11 @@ func (g *Graph) EdgesTo(edgeType string, id Path, fn func(e Edge) bool) {
 
 func (g *Graph) Export() *Export {
 	exp := &Export{}
-	g.RangeNodes(func(n Node) bool {
+	g.RangeNodes("*", func(n Node) bool {
 		exp.Nodes = append(exp.Nodes, n)
 		return true
 	})
-	g.RangeEdges(func(e Edge) bool {
+	g.RangeEdges("*", func(e Edge) bool {
 		exp.Edges = append(exp.Edges, e)
 		return true
 	})
@@ -267,58 +269,169 @@ func (g *Graph) DFS(edgeType string, rootNode Path, fn func(nodePath Node) bool)
 	if !ok {
 		return
 	}
-	g.dfs(edgeType, root, stack, visited)
+	g.dfs(false, edgeType, &root, stack, visited)
 	stack.Range(func(element interface{}) bool {
-		path := element.(Node)
-		if path.XID == rootNode.XID && path.XType == rootNode.XType {
-			return true
+		path := element.(*Node)
+		if path.Path != rootNode {
+			return fn(*path)
 		}
-		return fn(path)
+		return true
 	})
 }
 
-func (g *Graph) dfs(edgeType string, n Node, stack ds.Stack, visited map[Path]struct{}) {
-	if _, ok := visited[n.Path]; !ok {
-		visited[n.Path] = struct{}{}
-		stack.Push(n)
-		g.EdgesFrom(edgeType, n.Path, func(e Edge) bool {
-			to, ok := g.GetNode(e.To)
-			if ok {
-				g.dfs(edgeType, to, stack, visited)
-			}
-			return true
-		})
-	}
-}
-
-
-func (g *Graph) BFS(edgeType string, rootNode Path, fn func(nodePath Node) bool) {
+func (g *Graph) ReverseDFS(edgeType string, rootNode Path, fn func(nodePath Node) bool) {
 	var visited = map[Path]struct{}{}
 	stack := ds.NewStack()
 	root, ok := g.GetNode(rootNode)
 	if !ok {
 		return
 	}
-	g.dfs(edgeType, root, stack, visited)
+	g.dfs(true, edgeType, &root, stack, visited)
 	stack.Range(func(element interface{}) bool {
-		path := element.(Node)
-		if path.XID == rootNode.XID && path.XType == rootNode.XType {
-			return true
+		path := element.(*Node)
+		if path.Path != rootNode {
+			return fn(*path)
 		}
-		return fn(path)
+		return true
 	})
 }
 
-func (g *Graph) bfs(edgeType string, n Node, stack ds.Stack, visited map[Path]struct{}) {
+func (g *Graph) dfs(reverse bool, edgeType string, n *Node, stack ds.Stack, visited map[Path]struct{}) {
 	if _, ok := visited[n.Path]; !ok {
 		visited[n.Path] = struct{}{}
 		stack.Push(n)
-		g.EdgesFrom(edgeType, n.Path, func(e Edge) bool {
-			to, ok := g.GetNode(e.To)
-			if ok {
-				g.dfs(edgeType, to, stack, visited)
-			}
+		if reverse {
+			g.RangeEdgesTo(edgeType, n.Path, func(e Edge) bool {
+				to, _ := g.GetNode(e.From)
+				g.dfs(reverse, edgeType, &to, stack, visited)
+				return true
+			})
+		} else {
+			g.RangeEdgesFrom(edgeType, n.Path, func(e Edge) bool {
+				to, _ := g.GetNode(e.To)
+				g.dfs(reverse, edgeType, &to, stack, visited)
+				return true
+			})
+		}
+
+	}
+}
+
+func (g *Graph) BFS(edgeType string, rootNode Path, fn func(nodePath Node) bool) {
+	var visited = map[Path]struct{}{}
+	q := ds.NewQueue()
+	root, ok := g.GetNode(rootNode)
+	if !ok {
+		return
+	}
+	g.bfs(false, edgeType, &root, q, visited)
+	q.Range(func(element interface{}) bool {
+		path := element.(*Node)
+		if path.Path != rootNode {
+			return fn(*path)
+		}
+		return true
+	})
+}
+
+func (g *Graph) ReverseBFS(edgeType string, rootNode Path, fn func(nodePath Node) bool) {
+	var visited = map[Path]struct{}{}
+	q := ds.NewQueue()
+	root, ok := g.GetNode(rootNode)
+	if !ok {
+		return
+	}
+	g.bfs(true, edgeType, &root, q, visited)
+	q.Range(func(element interface{}) bool {
+		path := element.(*Node)
+		if path.Path != rootNode {
+			return fn(*path)
+		}
+		return true
+	})
+}
+
+func (g *Graph) bfs(reverse bool, edgeType string, n *Node, q ds.Queue, visited map[Path]struct{}) {
+	if _, ok := visited[n.Path]; !ok {
+		visited[n.Path] = struct{}{}
+		q.Enqueue(n)
+		if reverse {
+			g.RangeEdgesTo(edgeType, n.Path, func(e Edge) bool {
+				to, _ := g.GetNode(e.From)
+				g.bfs(reverse, edgeType, &to, q, visited)
+				return true
+			})
+		} else {
+			g.RangeEdgesFrom(edgeType, n.Path, func(e Edge) bool {
+				to, _ := g.GetNode(e.To)
+				g.bfs(reverse, edgeType, &to, q, visited)
+				return true
+			})
+		}
+	}
+}
+
+func (g *Graph) TopologicalSort(fn func(node Node) bool) {
+	var (
+		permanent = map[Path]struct{}{}
+		temp      = map[Path]struct{}{}
+		stack     = ds.NewStack()
+	)
+	g.RangeNodes("*", func(n Node) bool {
+		g.topology(false, stack, n.Path, permanent, temp)
+		return true
+	})
+	for stack.Len() > 0 {
+		this, ok := stack.Pop()
+		if !ok {
+			return
+		}
+		n, _ := g.GetNode(this.(Path))
+		if !fn(n) {
+			return
+		}
+	}
+}
+
+func (g *Graph) ReverseTopologicalSort(fn func(node Node) bool) {
+	var (
+		permanent = map[Path]struct{}{}
+		temp      = map[Path]struct{}{}
+		stack     = ds.NewStack()
+	)
+	g.RangeNodes("*", func(n Node) bool {
+		g.topology(true, stack, n.Path, permanent, temp)
+		return true
+	})
+	for stack.Len() > 0 {
+		this, ok := stack.Pop()
+		if !ok {
+			return
+		}
+		n, _ := g.GetNode(this.(Path))
+		if !fn(n) {
+			return
+		}
+	}
+}
+
+func (g *Graph) topology(reverse bool, stack ds.Stack, path Path, permanent, temporary map[Path]struct{}) {
+	if _, ok := permanent[path]; ok {
+		return
+	}
+	if reverse {
+		g.RangeEdgesTo("*", path, func(e Edge) bool {
+			g.topology(reverse, stack, e.From, permanent, temporary)
+			return true
+		})
+	} else {
+		g.RangeEdgesFrom("*", path, func(e Edge) bool {
+			g.topology(reverse, stack, e.To, permanent, temporary)
 			return true
 		})
 	}
+
+	delete(temporary, path)
+	permanent[path] = struct{}{}
+	stack.Push(path)
 }

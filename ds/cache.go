@@ -20,16 +20,18 @@ type NamespacedCache interface {
 
 func NewCache() NamespacedCache {
 	return &namespacedCache{
-		cacheMap:  map[string]map[string]interface{}{},
-		mu:        sync.RWMutex{},
-		closeOnce: sync.Once{},
+		cacheMap:   map[string]map[string]interface{}{},
+		mu:         sync.RWMutex{},
+		closeOnce:  sync.Once{},
+		namespaces: map[string]struct{}{},
 	}
 }
 
 type namespacedCache struct {
-	cacheMap  map[string]map[string]interface{}
-	mu        sync.RWMutex
-	closeOnce sync.Once
+	cacheMap   map[string]map[string]interface{}
+	namespaces map[string]struct{}
+	mu         sync.RWMutex
+	closeOnce  sync.Once
 }
 
 func (n *namespacedCache) Len(namespace string) int {
@@ -45,7 +47,7 @@ func (n *namespacedCache) Namespaces() []string {
 	var namespaces []string
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	for k, _ := range n.cacheMap {
+	for k, _ := range n.namespaces {
 		namespaces = append(namespaces, k)
 	}
 	sort.Strings(namespaces)
@@ -67,6 +69,7 @@ func (n *namespacedCache) Set(namespace string, key string, value interface{}) {
 	if n.cacheMap[namespace] == nil {
 		n.cacheMap[namespace] = map[string]interface{}{}
 	}
+	n.namespaces[namespace] = struct{}{}
 	n.cacheMap[namespace][key] = value
 }
 
