@@ -1,7 +1,7 @@
 package ds_test
 
 import (
-	"github.com/autom8ter/dagger/ds"
+	"github.com/autom8ter/dagger/internal/ds"
 	"testing"
 )
 

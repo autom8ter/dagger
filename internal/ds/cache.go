@@ -1,7 +1,7 @@
 package ds
 
 import (
-	"github.com/autom8ter/dagger/constants"
+	"github.com/autom8ter/dagger/internal/constants"
 	"sort"
 	"sync"
 )

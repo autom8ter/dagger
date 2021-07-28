@@ -2,7 +2,7 @@ package dagger_test
 
 import (
 	"github.com/autom8ter/dagger"
-	"github.com/autom8ter/dagger/util"
+	"github.com/autom8ter/dagger/internal/util"
 	"testing"
 )
 
@@ -171,7 +171,7 @@ func Test(t *testing.T) {
 	}
 
 	i = 0
-	g.TopologicalSort(func(node dagger.Node) bool {
+	g.TopologicalSort("infra", "depends_on", func(node dagger.Node) bool {
 		i++
 		t.Logf("(%v) TopologicalSort: %s", i, util.JSONString(node))
 		return true
@@ -181,7 +181,7 @@ func Test(t *testing.T) {
 	}
 
 	i = 0
-	g.ReverseTopologicalSort(func(node dagger.Node) bool {
+	g.ReverseTopologicalSort("infra", "depends_on", func(node dagger.Node) bool {
 		i++
 		t.Logf("(%v) ReverseTopologicalSort: %s", i, util.JSONString(node))
 		return true

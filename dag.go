@@ -2,9 +2,9 @@ package dagger
 
 import (
 	"fmt"
-	"github.com/autom8ter/dagger/constants"
-	"github.com/autom8ter/dagger/ds"
-	"github.com/autom8ter/dagger/util"
+	"github.com/autom8ter/dagger/internal/constants"
+	"github.com/autom8ter/dagger/internal/ds"
+	"github.com/autom8ter/dagger/internal/util"
 )
 
 // Graph is a concurrency safe, mutable, in-memory directed graph
@@ -243,6 +243,7 @@ func (g *Graph) Export() *Export {
 	return exp
 }
 
+// Import imports the export instance into the graph
 func (g *Graph) Import(exp *Export) error {
 	for _, n := range exp.Nodes {
 		g.SetNode(n.Path, n.Attributes)
@@ -255,6 +256,7 @@ func (g *Graph) Import(exp *Export) error {
 	return nil
 }
 
+// Close closes the graph
 func (g *Graph) Close() {
 	g.nodes.Close()
 	g.edgesTo.Close()
@@ -262,6 +264,7 @@ func (g *Graph) Close() {
 	g.edges.Close()
 }
 
+// DFS executes a depth first search with the rootNode and edge type
 func (g *Graph) DFS(edgeType string, rootNode Path, fn func(nodePath Node) bool) {
 	var visited = map[Path]struct{}{}
 	stack := ds.NewStack()
@@ -279,6 +282,7 @@ func (g *Graph) DFS(edgeType string, rootNode Path, fn func(nodePath Node) bool)
 	})
 }
 
+// ReverseDFS executes a reverse depth first search with the rootNode and edge type
 func (g *Graph) ReverseDFS(edgeType string, rootNode Path, fn func(nodePath Node) bool) {
 	var visited = map[Path]struct{}{}
 	stack := ds.NewStack()
@@ -317,6 +321,7 @@ func (g *Graph) dfs(reverse bool, edgeType string, n *Node, stack ds.Stack, visi
 	}
 }
 
+// BFS executes a depth first search with the rootNode and edge type
 func (g *Graph) BFS(edgeType string, rootNode Path, fn func(nodePath Node) bool) {
 	var visited = map[Path]struct{}{}
 	q := ds.NewQueue()
@@ -334,6 +339,7 @@ func (g *Graph) BFS(edgeType string, rootNode Path, fn func(nodePath Node) bool)
 	})
 }
 
+// ReverseBFS executes a reverse depth first search with the rootNode and edge type
 func (g *Graph) ReverseBFS(edgeType string, rootNode Path, fn func(nodePath Node) bool) {
 	var visited = map[Path]struct{}{}
 	q := ds.NewQueue()
@@ -371,14 +377,15 @@ func (g *Graph) bfs(reverse bool, edgeType string, n *Node, q ds.Queue, visited 
 	}
 }
 
-func (g *Graph) TopologicalSort(fn func(node Node) bool) {
+// TopologicalSort executes a topological sort
+func (g *Graph) TopologicalSort(nodeType, edgeType string, fn func(node Node) bool) {
 	var (
 		permanent = map[Path]struct{}{}
 		temp      = map[Path]struct{}{}
 		stack     = ds.NewStack()
 	)
-	g.RangeNodes("*", func(n Node) bool {
-		g.topology(false, stack, n.Path, permanent, temp)
+	g.RangeNodes(nodeType, func(n Node) bool {
+		g.topology(false, edgeType, stack, n.Path, permanent, temp)
 		return true
 	})
 	for stack.Len() > 0 {
@@ -393,14 +400,14 @@ func (g *Graph) TopologicalSort(fn func(node Node) bool) {
 	}
 }
 
-func (g *Graph) ReverseTopologicalSort(fn func(node Node) bool) {
+func (g *Graph) ReverseTopologicalSort(nodeType, edgeType string, fn func(node Node) bool) {
 	var (
 		permanent = map[Path]struct{}{}
 		temp      = map[Path]struct{}{}
 		stack     = ds.NewStack()
 	)
-	g.RangeNodes("*", func(n Node) bool {
-		g.topology(true, stack, n.Path, permanent, temp)
+	g.RangeNodes(nodeType, func(n Node) bool {
+		g.topology(true, edgeType, stack, n.Path, permanent, temp)
 		return true
 	})
 	for stack.Len() > 0 {
@@ -415,18 +422,18 @@ func (g *Graph) ReverseTopologicalSort(fn func(node Node) bool) {
 	}
 }
 
-func (g *Graph) topology(reverse bool, stack ds.Stack, path Path, permanent, temporary map[Path]struct{}) {
+func (g *Graph) topology(reverse bool, edgeType string, stack ds.Stack, path Path, permanent, temporary map[Path]struct{}) {
 	if _, ok := permanent[path]; ok {
 		return
 	}
 	if reverse {
-		g.RangeEdgesTo("*", path, func(e Edge) bool {
-			g.topology(reverse, stack, e.From, permanent, temporary)
+		g.RangeEdgesTo(edgeType, path, func(e Edge) bool {
+			g.topology(reverse, edgeType, stack, e.From, permanent, temporary)
 			return true
 		})
 	} else {
-		g.RangeEdgesFrom("*", path, func(e Edge) bool {
-			g.topology(reverse, stack, e.To, permanent, temporary)
+		g.RangeEdgesFrom(edgeType, path, func(e Edge) bool {
+			g.topology(reverse, edgeType, stack, e.To, permanent, temporary)
 			return true
 		})
 	}
