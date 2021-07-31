@@ -2,26 +2,36 @@ package dagger
 
 import (
 	"fmt"
-	"github.com/autom8ter/dagger/internal/constants"
-	"github.com/autom8ter/dagger/internal/ds"
-	"github.com/autom8ter/dagger/internal/util"
+	"github.com/autom8ter/dagger/constants"
+	"github.com/autom8ter/dagger/driver"
+	"github.com/autom8ter/dagger/util"
 )
 
 // Graph is a concurrency safe, mutable, in-memory directed graph
 type Graph struct {
-	nodes     ds.NamespacedCache
-	edges     ds.NamespacedCache
-	edgesFrom ds.NamespacedCache
-	edgesTo   ds.NamespacedCache
+	nodes     driver.Index
+	edges     driver.Index
+	edgesFrom driver.Index
+	edgesTo   driver.Index
 }
 
-// NewGraph creates a new Graph instance
+// NewGraph creates a new in-memory Graph instance
 func NewGraph() *Graph {
 	return &Graph{
-		nodes:     ds.NewCache(),
-		edges:     ds.NewCache(),
-		edgesFrom: ds.NewCache(),
-		edgesTo:   ds.NewCache(),
+		nodes:     driver.NewInMemIndex(),
+		edges:     driver.NewInMemIndex(),
+		edgesFrom: driver.NewInMemIndex(),
+		edgesTo:   driver.NewInMemIndex(),
+	}
+}
+
+// CustomGraph creates a new Graph instance with the given Index interface implementations
+func CustomGraph(nodes, edges, edgesFrom, edgesTo driver.Index) *Graph {
+	return &Graph{
+		nodes:     nodes,
+		edges:     edges,
+		edgesFrom: edgesFrom,
+		edgesTo:   edgesTo,
 	}
 }
 
@@ -103,7 +113,7 @@ func (g *Graph) HasNode(id Path) bool {
 func (g *Graph) DelNode(id Path) {
 	if val, ok := g.edgesFrom.Get(id.XType, id.XID); ok {
 		if val != nil {
-			edges := val.(ds.NamespacedCache)
+			edges := val.(driver.Index)
 			edges.Range("*", func(key string, val interface{}) bool {
 				g.DelEdge(val.(Edge).Path)
 				return true
@@ -112,7 +122,7 @@ func (g *Graph) DelNode(id Path) {
 	}
 	if val, ok := g.edgesTo.Get(id.XType, id.XID); ok {
 		if val != nil {
-			edges := val.(ds.NamespacedCache)
+			edges := val.(driver.Index)
 			edges.Range("*", func(key string, val interface{}) bool {
 				g.DelEdge(val.(Edge).Path)
 				return true
@@ -152,20 +162,20 @@ func (g *Graph) SetEdge(from, to Path, node Node) (Edge, error) {
 	g.edges.Set(e.Path.XType, e.Path.XID, e)
 
 	if val, ok := g.edgesFrom.Get(e.From.XType, e.From.XID); ok && val != nil {
-		edges := val.(ds.NamespacedCache)
+		edges := val.(driver.Index)
 		edges.Set(e.XType, e.XID, e)
 		g.edgesFrom.Set(e.From.XType, e.From.XID, edges)
 	} else {
-		edges := ds.NewCache()
+		edges := driver.NewInMemIndex()
 		edges.Set(e.XType, e.XID, e)
 		g.edgesFrom.Set(e.From.XType, e.From.XID, edges)
 	}
 	if val, ok := g.edgesTo.Get(e.To.XType, e.To.XID); ok && val != nil {
-		edges := val.(ds.NamespacedCache)
+		edges := val.(driver.Index)
 		edges.Set(e.XType, e.XID, e)
 		g.edgesTo.Set(e.To.XType, e.To.XID, edges)
 	} else {
-		edges := ds.NewCache()
+		edges := driver.NewInMemIndex()
 		edges.Set(e.XType, e.XID, e)
 		g.edgesTo.Set(e.To.XType, e.To.XID, edges)
 	}
@@ -194,13 +204,13 @@ func (g *Graph) DelEdge(id Path) {
 		edge := val.(Edge)
 		fromVal, ok := g.edgesFrom.Get(edge.From.XType, edge.From.XID)
 		if ok && fromVal != nil {
-			edges := fromVal.(ds.NamespacedCache)
+			edges := fromVal.(driver.Index)
 			edges.Delete(id.XType, id.XID)
 			g.edgesFrom.Set(edge.From.XType, edge.From.XID, edges)
 		}
 		toVal, ok := g.edgesTo.Get(edge.To.XType, edge.To.XID)
 		if ok && toVal != nil {
-			edges := toVal.(ds.NamespacedCache)
+			edges := toVal.(driver.Index)
 			edges.Delete(id.XType, id.XID)
 			g.edgesTo.Set(edge.To.XType, edge.To.XID, edges)
 		}
@@ -211,7 +221,7 @@ func (g *Graph) DelEdge(id Path) {
 func (g *Graph) RangeEdgesFrom(edgeType string, id Path, fn func(e Edge) bool) {
 	val, ok := g.edgesFrom.Get(id.XType, id.XID)
 	if ok {
-		if edges, ok := val.(ds.NamespacedCache); ok {
+		if edges, ok := val.(driver.Index); ok {
 			edges.Range(edgeType, func(key string, val interface{}) bool {
 				return fn(val.(Edge))
 			})
@@ -222,7 +232,7 @@ func (g *Graph) RangeEdgesFrom(edgeType string, id Path, fn func(e Edge) bool) {
 func (g *Graph) RangeEdgesTo(edgeType string, id Path, fn func(e Edge) bool) {
 	val, ok := g.edgesTo.Get(id.XType, id.XID)
 	if ok {
-		if edges, ok := val.(ds.NamespacedCache); ok {
+		if edges, ok := val.(driver.Index); ok {
 			edges.Range(edgeType, func(key string, val interface{}) bool {
 				return fn(val.(Edge))
 			})
@@ -267,7 +277,7 @@ func (g *Graph) Close() {
 // DFS executes a depth first search with the rootNode and edge type
 func (g *Graph) DFS(edgeType string, rootNode Path, fn func(nodePath Node) bool) {
 	var visited = map[Path]struct{}{}
-	stack := ds.NewStack()
+	stack := driver.NewInMemStack()
 	root, ok := g.GetNode(rootNode)
 	if !ok {
 		return
@@ -285,7 +295,7 @@ func (g *Graph) DFS(edgeType string, rootNode Path, fn func(nodePath Node) bool)
 // ReverseDFS executes a reverse depth first search with the rootNode and edge type
 func (g *Graph) ReverseDFS(edgeType string, rootNode Path, fn func(nodePath Node) bool) {
 	var visited = map[Path]struct{}{}
-	stack := ds.NewStack()
+	stack := driver.NewInMemStack()
 	root, ok := g.GetNode(rootNode)
 	if !ok {
 		return
@@ -300,7 +310,7 @@ func (g *Graph) ReverseDFS(edgeType string, rootNode Path, fn func(nodePath Node
 	})
 }
 
-func (g *Graph) dfs(reverse bool, edgeType string, n *Node, stack ds.Stack, visited map[Path]struct{}) {
+func (g *Graph) dfs(reverse bool, edgeType string, n *Node, stack driver.Stack, visited map[Path]struct{}) {
 	if _, ok := visited[n.Path]; !ok {
 		visited[n.Path] = struct{}{}
 		stack.Push(n)
@@ -324,7 +334,7 @@ func (g *Graph) dfs(reverse bool, edgeType string, n *Node, stack ds.Stack, visi
 // BFS executes a depth first search with the rootNode and edge type
 func (g *Graph) BFS(edgeType string, rootNode Path, fn func(nodePath Node) bool) {
 	var visited = map[Path]struct{}{}
-	q := ds.NewQueue()
+	q := driver.NewInMemQueue()
 	root, ok := g.GetNode(rootNode)
 	if !ok {
 		return
@@ -342,7 +352,7 @@ func (g *Graph) BFS(edgeType string, rootNode Path, fn func(nodePath Node) bool)
 // ReverseBFS executes a reverse depth first search with the rootNode and edge type
 func (g *Graph) ReverseBFS(edgeType string, rootNode Path, fn func(nodePath Node) bool) {
 	var visited = map[Path]struct{}{}
-	q := ds.NewQueue()
+	q := driver.NewInMemQueue()
 	root, ok := g.GetNode(rootNode)
 	if !ok {
 		return
@@ -357,7 +367,7 @@ func (g *Graph) ReverseBFS(edgeType string, rootNode Path, fn func(nodePath Node
 	})
 }
 
-func (g *Graph) bfs(reverse bool, edgeType string, n *Node, q ds.Queue, visited map[Path]struct{}) {
+func (g *Graph) bfs(reverse bool, edgeType string, n *Node, q driver.Queue, visited map[Path]struct{}) {
 	if _, ok := visited[n.Path]; !ok {
 		visited[n.Path] = struct{}{}
 		q.Enqueue(n)
@@ -382,7 +392,7 @@ func (g *Graph) TopologicalSort(nodeType, edgeType string, fn func(node Node) bo
 	var (
 		permanent = map[Path]struct{}{}
 		temp      = map[Path]struct{}{}
-		stack     = ds.NewStack()
+		stack     = driver.NewInMemStack()
 	)
 	g.RangeNodes(nodeType, func(n Node) bool {
 		g.topology(false, edgeType, stack, n.Path, permanent, temp)
@@ -404,7 +414,7 @@ func (g *Graph) ReverseTopologicalSort(nodeType, edgeType string, fn func(node N
 	var (
 		permanent = map[Path]struct{}{}
 		temp      = map[Path]struct{}{}
-		stack     = ds.NewStack()
+		stack     = driver.NewInMemStack()
 	)
 	g.RangeNodes(nodeType, func(n Node) bool {
 		g.topology(true, edgeType, stack, n.Path, permanent, temp)
@@ -422,7 +432,7 @@ func (g *Graph) ReverseTopologicalSort(nodeType, edgeType string, fn func(node N
 	}
 }
 
-func (g *Graph) topology(reverse bool, edgeType string, stack ds.Stack, path Path, permanent, temporary map[Path]struct{}) {
+func (g *Graph) topology(reverse bool, edgeType string, stack driver.Stack, path Path, permanent, temporary map[Path]struct{}) {
 	if _, ok := permanent[path]; ok {
 		return
 	}

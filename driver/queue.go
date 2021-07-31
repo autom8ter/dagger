@@ -1,20 +1,7 @@
-package ds
-
-type Queue interface {
-	Enqueue(val interface{})
-	Dequeue() (interface{}, bool)
-	IsEmpty() bool
-	Len() int
-	Range(fn func(element interface{}) bool)
-}
+package driver
 
 type queue struct {
 	values []interface{}
-}
-
-func NewQueue() Queue {
-	vals := &queue{[]interface{}{}}
-	return vals
 }
 
 func (q *queue) IsEmpty() bool {

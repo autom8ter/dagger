@@ -1,40 +1,19 @@
-package ds
+package driver
 
 import (
-	"github.com/autom8ter/dagger/internal/constants"
+	"github.com/autom8ter/dagger/constants"
 	"sort"
 	"sync"
 )
 
-type NamespacedCache interface {
-	Len(namespace string) int
-	Namespaces() []string
-	Get(namespace string, key string) (interface{}, bool)
-	Set(namespace string, key string, value interface{})
-	Range(namespace string, f func(key string, value interface{}) bool)
-	Delete(namespace string, key string)
-	Exists(namespace string, key string) bool
-	Clear(namespace string)
-	Close()
-}
-
-func NewCache() NamespacedCache {
-	return &namespacedCache{
-		cacheMap:   map[string]map[string]interface{}{},
-		mu:         sync.RWMutex{},
-		closeOnce:  sync.Once{},
-		namespaces: map[string]struct{}{},
-	}
-}
-
-type namespacedCache struct {
+type inMemIndex struct {
 	cacheMap   map[string]map[string]interface{}
 	namespaces map[string]struct{}
 	mu         sync.RWMutex
 	closeOnce  sync.Once
 }
 
-func (n *namespacedCache) Len(namespace string) int {
+func (n *inMemIndex) Len(namespace string) int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	if c, ok := n.cacheMap[namespace]; ok {
@@ -43,7 +22,7 @@ func (n *namespacedCache) Len(namespace string) int {
 	return 0
 }
 
-func (n *namespacedCache) Namespaces() []string {
+func (n *inMemIndex) Namespaces() []string {
 	var namespaces []string
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -54,7 +33,7 @@ func (n *namespacedCache) Namespaces() []string {
 	return namespaces
 }
 
-func (n *namespacedCache) Get(namespace string, key string) (interface{}, bool) {
+func (n *inMemIndex) Get(namespace string, key string) (interface{}, bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	if c, ok := n.cacheMap[namespace]; ok {
@@ -63,7 +42,7 @@ func (n *namespacedCache) Get(namespace string, key string) (interface{}, bool) 
 	return nil, false
 }
 
-func (n *namespacedCache) Set(namespace string, key string, value interface{}) {
+func (n *inMemIndex) Set(namespace string, key string, value interface{}) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if n.cacheMap[namespace] == nil {
@@ -73,7 +52,7 @@ func (n *namespacedCache) Set(namespace string, key string, value interface{}) {
 	n.cacheMap[namespace][key] = value
 }
 
-func (n *namespacedCache) Range(namespace string, f func(key string, value interface{}) bool) {
+func (n *inMemIndex) Range(namespace string, f func(key string, value interface{}) bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	if namespace == constants.AnyType {
@@ -91,7 +70,7 @@ func (n *namespacedCache) Range(namespace string, f func(key string, value inter
 	}
 }
 
-func (n *namespacedCache) Delete(namespace string, key string) {
+func (n *inMemIndex) Delete(namespace string, key string) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	if c, ok := n.cacheMap[namespace]; ok {
@@ -99,14 +78,14 @@ func (n *namespacedCache) Delete(namespace string, key string) {
 	}
 }
 
-func (n *namespacedCache) Exists(namespace string, key string) bool {
+func (n *inMemIndex) Exists(namespace string, key string) bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	_, ok := n.cacheMap[namespace][key]
 	return ok
 }
 
-func (n *namespacedCache) Clear(namespace string) {
+func (n *inMemIndex) Clear(namespace string) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	if cache, ok := n.cacheMap[namespace]; ok {
@@ -116,7 +95,7 @@ func (n *namespacedCache) Clear(namespace string) {
 	}
 }
 
-func (n *namespacedCache) Close() {
+func (n *inMemIndex) Close() {
 	n.closeOnce.Do(func() {
 		n.mu.Lock()
 		defer n.mu.Unlock()

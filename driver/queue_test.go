@@ -1,12 +1,12 @@
-package ds_test
+package driver_test
 
 import (
-	"github.com/autom8ter/dagger/internal/ds"
+	"github.com/autom8ter/dagger/driver"
 	"testing"
 )
 
 func TestQueue(t *testing.T) {
-	q := ds.NewQueue()
+	q := driver.NewQueue()
 	q.Enqueue("hello")
 	q.Enqueue("world")
 	q.Enqueue("tester")

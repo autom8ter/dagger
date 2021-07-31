@@ -1,7 +1,7 @@
 package dagger
 
 import (
-	"github.com/autom8ter/dagger/internal/util"
+	"github.com/autom8ter/dagger/util"
 )
 
 // Edge is a relationship between two nodes

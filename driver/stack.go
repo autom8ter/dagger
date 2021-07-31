@@ -1,18 +1,6 @@
-package ds
+package driver
 
-type Stack interface {
-	Pop() (interface{}, bool)
-	Push(f interface{})
-	Range(fn func(element interface{}) bool)
-	IsEmpty() bool
-	Len() int
-}
 type stackI []interface{}
-
-func NewStack() Stack {
-	vals := stackI([]interface{}{})
-	return &vals
-}
 
 // IsEmpty: check if stack is empty
 func (s *stackI) IsEmpty() bool {

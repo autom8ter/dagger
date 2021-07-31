@@ -2,7 +2,7 @@ package dagger_test
 
 import (
 	"github.com/autom8ter/dagger"
-	"github.com/autom8ter/dagger/internal/util"
+	"github.com/autom8ter/dagger/util"
 	"testing"
 )
 
