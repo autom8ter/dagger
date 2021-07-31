@@ -6,22 +6,17 @@ dagger is a blazing fast, concurrency safe, mutable, in-memory directed graph im
     
     import "github.com/autom8ter/dagger"
 
-## Design:
-
-- flexibility
-- concurrency safe
-- high performance
-- simple api
-
 ## Features
 
 - [x] native graph objects(nodes/edges)
-- [x] typed graph objects(ex: user/pet)
+- [x] concurrency safe
+- [x] namespaced graph objects(ex: user/pet)
 - [x] labelled nodes & edges
 - [x] depth first search
 - [x] breadth first search
 - [x] topological sort
-- [x] concurrency safe
+- [x] import/export
+- [ ] visualization
 
 ## Example
 
