@@ -58,13 +58,17 @@ func (n *inMemIndex) Range(namespace string, f func(key string, value interface{
 	if namespace == constants.AnyType {
 		for _, c := range n.cacheMap {
 			for k, v := range c {
-				f(k, v)
+				if !f(k, v) {
+					return
+				}
 			}
 		}
 	} else {
 		if c, ok := n.cacheMap[namespace]; ok {
 			for k, v := range c {
-				f(k, v)
+				if !f(k, v) {
+					return
+				}
 			}
 		}
 	}
