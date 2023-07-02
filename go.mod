@@ -1,3 +1,3 @@
 module github.com/autom8ter/dagger
 
-go 1.15
+go 1.20
