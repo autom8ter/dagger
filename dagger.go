@@ -1,6 +1,7 @@
 package dagger
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -267,9 +268,18 @@ func (g *Graph[N]) RangeNodes(fn func(n *GraphNode[N]) bool) {
 func (g *Graph[N]) BFS(reverse bool, start *GraphNode[N], fn func(node *GraphNode[N]) bool) {
 	var visited = map[string]struct{}{}
 	q := NewQueue[*GraphNode[N]]()
-	g.bfs(reverse, start, nil, q, visited)
-	q.Range(func(element *GraphNode[N]) bool {
-		debugF("bfs: visiting %s\n", element.Value.ID())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		var (
+			wg = &sync.WaitGroup{}
+			mu = &sync.RWMutex{}
+		)
+		g.bfs(wg, mu, reverse, start, nil, q, visited)
+		wg.Wait()
+		cancel()
+	}()
+	q.RangeContext(ctx, func(element *GraphNode[N]) bool {
 		if element.Value.ID() != start.Value.ID() {
 			return fn(element)
 		}
@@ -316,23 +326,37 @@ func (g *Graph[N]) dfs(reverse bool, root, next *GraphNode[N], stack *Stack[*Gra
 	debugF("dfs: finished visiting %s\n", next.Value.ID())
 }
 
-func (g *Graph[N]) bfs(reverse bool, root, next *GraphNode[N], q *Queue[*GraphNode[N]], visited map[string]struct{}) {
+func (g *Graph[N]) bfs(wg *sync.WaitGroup, mu *sync.RWMutex, reverse bool, root, next *GraphNode[N], q *Queue[*GraphNode[N]], visited map[string]struct{}) {
 	if next == nil {
 		next = root
 	}
-	if _, ok := visited[next.Value.ID()]; !ok {
+	mu.Lock()
+	_, ok := visited[next.Value.ID()]
+	if !ok {
 		visited[next.Value.ID()] = struct{}{}
+	}
+	mu.Unlock()
+	if !ok {
 		q.Push(next)
 		if reverse {
 			next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
 				to, _ := g.nodes.Get(edge.From.Value.ID())
-				g.bfs(reverse, root, to, q, visited)
+				wg.Add(1)
+				go func(to *GraphNode[N], visited map[string]struct{}) {
+					defer wg.Done()
+					g.bfs(wg, mu, reverse, root, to, q, visited)
+				}(to, visited)
+
 				return len(visited) < g.nodes.Len()
 			})
 		} else {
 			next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
 				to, _ := g.nodes.Get(edge.To.Value.ID())
-				g.bfs(reverse, root, to, q, visited)
+				wg.Add(1)
+				go func(to *GraphNode[N], visited map[string]struct{}) {
+					defer wg.Done()
+					g.bfs(wg, mu, reverse, root, to, q, visited)
+				}(to, visited)
 				return len(visited) < g.nodes.Len()
 			})
 		}
@@ -464,63 +488,73 @@ func (n *HashMap[T]) Clear() {
 
 // NewQueue returns a new Queue with the given initial size.
 func NewQueue[T any]() *Queue[T] {
-	vals := &Queue[T]{values: []T{}}
-	return vals
+	vals := make(chan T)
+	return &Queue[T]{ch: vals}
 }
 
 // Queue is a basic FIFO Queue based on a circular list that resizes as needed.
 type Queue[T any] struct {
-	mu     sync.RWMutex
-	values []T
+	closeOnce sync.Once
+	ch        chan T
 }
 
 // Range executes a provided function once for each Queue element until it returns false.
 func (q *Queue[T]) Range(fn func(element T) bool) {
 	for {
-		r, ok := q.Pop()
-		if !ok {
-			return
-		}
-		if !fn(r) {
-			return
+		select {
+		case r, ok := <-q.ch:
+			if !ok {
+				return
+			}
+			if !fn(r) {
+				return
+			}
 		}
 	}
+}
+
+// RangeContext executes a provided function once for each Queue element until it returns false or the context is done.
+func (q *Queue[T]) RangeContext(ctx context.Context, fn func(element T) bool) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case r, ok := <-q.ch:
+			if !ok {
+				return
+			}
+			if !fn(r) {
+				return
+			}
+		}
+	}
+}
+
+// Close closes the Queue channel.
+func (q *Queue[T]) Close() {
+	q.closeOnce.Do(func() {
+		close(q.ch)
+	})
 }
 
 // Push adds an element to the end of the Queue.
 func (q *Queue[T]) Push(val T) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	q.values = append(q.values, val)
+	q.ch <- val
 }
 
 // Pop removes and returns an element from the beginning of the Queue.
 func (q *Queue[T]) Pop() (T, bool) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	if len(q.values) == 0 {
-		return *new(T), false
+	select {
+	case r, ok := <-q.ch:
+		return r, ok
 	}
-	val := q.values[0]
-	q.values = q.values[1:]
-	return val, true
 }
 
 // Len returns the number of elements in the Queue.
 func (q *Queue[T]) Len() int {
-	q.mu.RLock()
-	defer q.mu.RUnlock()
-	return len(q.values)
-}
-
-// Peek returns the first element of the Queue without removing it.
-func (q *Queue[T]) Peek() (T, bool) {
-	q.mu.RLock()
-	defer q.mu.RUnlock()
-	if q.Len() == 0 {
-		return *new(T), false
-	}
-	return q.values[0], true
+	return len(q.ch)
 }
 
 // NewStack returns a new Stack
