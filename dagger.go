@@ -4,8 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"image"
 	"log"
 	"sync"
+
+	"github.com/goccy/go-graphviz"
+	"github.com/goccy/go-graphviz/cgraph"
 )
 
 // Edge is a relationship between two nodes
@@ -17,6 +21,7 @@ type Edge[T any] struct {
 	// Attributes returns the attributes of the edge
 	Attributes map[string]string `json:"attributes"`
 	id         string
+	edge       *cgraph.Edge
 }
 
 // ID returns the unique identifier of the edge
@@ -31,6 +36,7 @@ type Node[T any] struct {
 	edgesFrom *hashMap[*Edge[T]]
 	edgesTo   *hashMap[*Edge[T]]
 	graph     *Graph[T]
+	node      *cgraph.Node
 }
 
 // ID returns the unique identifier of the node
@@ -51,7 +57,7 @@ func (n *Node[T]) EdgesFrom(fn func(e *Edge[T]) bool) {
 func (n *Node[T]) EdgesTo(fn func(e *Edge[T]) bool) {
 	n.graph.mu.RLock()
 	defer n.graph.mu.RUnlock()
-	n.edgesFrom.Range(func(key string, edge *Edge[T]) bool {
+	n.edgesTo.Range(func(key string, edge *Edge[T]) bool {
 		return fn(edge)
 	})
 }
@@ -100,6 +106,11 @@ func (n *Node[T]) AddEdge(nodeID string, attributes map[string]string) (*Edge[T]
 		To:         to,
 		Attributes: attributes,
 	}
+	edge, err := n.graph.viz.CreateEdge(e.id, n.node, to.node)
+	if err != nil {
+		return nil, err
+	}
+	e.edge = edge
 	n.graph.edges.Set(e.id, e)
 	to.edgesTo.Set(e.id, e)
 	n.edgesFrom.Set(e.id, e)
@@ -114,9 +125,14 @@ func (n *Node[T]) RemoveEdge(edgeID string) {
 }
 
 func (n *Node[T]) removeEdge(edgeID string) {
+	edge, ok := n.graph.edges.Get(edgeID)
+	if !ok {
+		return
+	}
 	n.graph.edges.Delete(edgeID)
 	n.edgesFrom.Delete(edgeID)
 	n.edgesTo.Delete(edgeID)
+	n.graph.viz.DeleteEdge(edge.edge)
 }
 
 // Remove removes the current node from the graph
@@ -132,6 +148,7 @@ func (n *Node[T]) Remove() error {
 		return true
 	})
 	n.graph.nodes.Delete(n.id)
+	n.graph.viz.DeleteNode(n.node)
 	return nil
 }
 
@@ -144,6 +161,8 @@ func (n *Node[T]) Graph() *Graph[T] {
 type Graph[T any] struct {
 	nodes *hashMap[*Node[T]]
 	edges *hashMap[*Edge[T]]
+	gviz  *graphviz.Graphviz
+	viz   *cgraph.Graph
 	mu    sync.RWMutex
 }
 
@@ -152,14 +171,16 @@ func NewGraph[T any](nodes ...*Node[T]) *Graph[T] {
 	g := &Graph[T]{
 		nodes: newMap[*Node[T]](),
 		edges: newMap[*Edge[T]](),
+		gviz:  graphviz.New(),
 	}
+	graph, _ := g.gviz.Graph()
+	g.viz = graph
 	for _, node := range nodes {
-		g.nodes.Set(node.id, node)
-		node.graph = g
+		g.SetNode(node)
 	}
 	for _, node := range nodes {
 		node.edgesFrom.Range(func(key string, edge *Edge[T]) bool {
-			g.edges.Set(edge.id, edge)
+			node.SetEdge(edge.id, edge.To.ID(), edge.Attributes)
 			return true
 		})
 	}
@@ -194,6 +215,8 @@ func (g *Graph[T]) SetNode(node *Node[T]) {
 		node.edgesFrom = newMap[*Edge[T]]()
 	}
 	g.nodes.Set(node.id, node)
+	n, _ := g.viz.CreateNode(node.id)
+	n.SetLabel(node.id)
 }
 
 // HasNode returns true if the node with the given id exists in the graph
@@ -425,6 +448,17 @@ func (g *Graph[T]) topology(reverse bool, stack *stack[string], node *Node[T], p
 	delete(temporary, node.id)
 	permanent[node.id] = struct{}{}
 	stack.Push(node.id)
+}
+
+// Vizualize returns a graphviz image
+func (g *Graph[T]) Vizualize() (image.Image, error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	img, err := g.gviz.RenderImage(g.viz)
+	if err != nil {
+		return nil, err
+	}
+	return img, nil
 }
 
 // newMap creates a new generic hash map
