@@ -6,125 +6,114 @@ import (
 	"fmt"
 	"image"
 	"log"
+	"os"
+	"strings"
 	"sync"
 
 	"github.com/goccy/go-graphviz"
 	"github.com/goccy/go-graphviz/cgraph"
 )
 
-// Edge is a relationship between two nodes
-type Edge[T any] struct {
+// Node is a node in a graph
+type Node interface {
+	// ID returns the unique id of the node
+	ID() string
+}
+
+// String is a generic string with methods to satisfy various interfaces such as the Node interface
+type String string
+
+// UniqueID returns a unique identifier with the given prefix
+func UniqueID(prefix string) String {
+	b := make([]byte, 4)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(err)
+	}
+	if prefix == "" {
+		prefix = "id"
+	}
+	return String(fmt.Sprintf("%s-%s", prefix, hex.EncodeToString(b)))
+}
+
+// ID returns the string
+func (s String) ID() string {
+	return string(s)
+}
+
+// GraphEdge is a relationship between two nodes
+type GraphEdge[N Node] struct {
+	// ID is the unique identifier of the edge
+	ID string `json:"id"`
+	// Metadata is the metadata of the edge
+	Metadata map[string]string `json:"metadata"`
 	// From returns the root node of the edge
-	From *Node[T] `json:"from"`
+	From *GraphNode[N] `json:"from"`
 	// To returns the target node of the edge
-	To *Node[T] `json:"to"`
-	// Attributes returns the attributes of the edge
-	Attributes map[string]string `json:"attributes"`
-	id         string
-	edge       *cgraph.Edge
+	To *GraphNode[N] `json:"to"`
+	// Relationship is the relationship between the two nodes
+	Relationship string `json:"relationship"`
+	edge         *cgraph.Edge
 }
 
-// ID returns the unique identifier of the edge
-func (e *Edge[T]) ID() string {
-	return e.id
-}
-
-// Node is a node in the graph. It can be connected to other nodes via edges.
-type Node[T any] struct {
-	Value     T
-	id        string
-	edgesFrom *hashMap[*Edge[T]]
-	edgesTo   *hashMap[*Edge[T]]
-	graph     *Graph[T]
+// GraphNode is a node in the graph. It can be connected to other nodes via edges.
+type GraphNode[N Node] struct {
+	// Value is the value of the node
+	Value     N
+	edgesFrom *HashMap[*GraphEdge[N]]
+	edgesTo   *HashMap[*GraphEdge[N]]
+	graph     *Graph[N]
 	node      *cgraph.Node
 }
 
-// ID returns the unique identifier of the node
-func (n *Node[T]) ID() string {
-	return n.id
-}
-
 // EdgesFrom returns the edges pointing from the current node
-func (n *Node[T]) EdgesFrom(fn func(e *Edge[T]) bool) {
+func (n *GraphNode[N]) EdgesFrom(fn func(e *GraphEdge[N]) bool) {
 	n.graph.mu.RLock()
 	defer n.graph.mu.RUnlock()
-	n.edgesFrom.Range(func(key string, edge *Edge[T]) bool {
+	n.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
 		return fn(edge)
 	})
 }
 
 // EdgesTo returns the edges pointing to the current node
-func (n *Node[T]) EdgesTo(fn func(e *Edge[T]) bool) {
+func (n *GraphNode[N]) EdgesTo(fn func(e *GraphEdge[N]) bool) {
 	n.graph.mu.RLock()
 	defer n.graph.mu.RUnlock()
-	n.edgesTo.Range(func(key string, edge *Edge[T]) bool {
+	n.edgesTo.Range(func(key string, edge *GraphEdge[N]) bool {
 		return fn(edge)
 	})
 }
 
-// SetEdge sets an edge from the current node to the node with the given nodeID
-func (n *Node[T]) SetEdge(edgeID string, nodeID string, attributes map[string]string) (*Edge[T], error) {
+// SetEdge sets an edge from the current node to the node with the given nodeID.
+// If the nodeID does not exist, an error is returned.
+// If the edgeID is empty, a unique id will be generated.
+// If the metadata is nil, an empty map will be used.
+func (n *GraphNode[N]) SetEdge(toNode *GraphNode[N], relationship string, metadata map[string]string) (*GraphEdge[N], error) {
+	if metadata == nil {
+		metadata = make(map[string]string)
+	}
 	n.graph.mu.Lock()
 	defer n.graph.mu.Unlock()
-	if attributes == nil {
-		attributes = make(map[string]string)
+	e := &GraphEdge[N]{
+		ID:       strings.ReplaceAll(strings.ToLower(fmt.Sprintf("%s-(%s)-%s", n.Value.ID(), relationship, toNode.Value.ID())), " ", "-"),
+		Metadata: metadata,
+		From:     n,
+		To:       toNode,
 	}
-	to, ok := n.graph.GetNode(nodeID)
-	if !ok {
-		return nil, fmt.Errorf("node %s does not exist", nodeID)
-	}
-
-	if edgeID == "" {
-		return nil, fmt.Errorf("edgeID cannot be empty")
-	}
-	e := &Edge[T]{
-		id:         edgeID,
-		From:       n,
-		To:         to,
-		Attributes: attributes,
-	}
-	n.graph.edges.Set(edgeID, e)
-	to.edgesTo.Set(edgeID, e)
-	n.edgesFrom.Set(edgeID, e)
-	return e, nil
-}
-
-// AddEdge adds an edge from the current node to the node with the given nodeID
-func (n *Node[T]) AddEdge(nodeID string, attributes map[string]string) (*Edge[T], error) {
-	n.graph.mu.Lock()
-	defer n.graph.mu.Unlock()
-	to, ok := n.graph.nodes.Get(nodeID)
-	if !ok {
-		return nil, fmt.Errorf("node %s does not exist", nodeID)
-	}
-	if attributes == nil {
-		attributes = make(map[string]string)
-	}
-	e := &Edge[T]{
-		id:         uniqueID(),
-		From:       n,
-		To:         to,
-		Attributes: attributes,
-	}
-	edge, err := n.graph.viz.CreateEdge(e.id, n.node, to.node)
-	if err != nil {
-		return nil, err
-	}
-	e.edge = edge
-	n.graph.edges.Set(e.id, e)
-	to.edgesTo.Set(e.id, e)
-	n.edgesFrom.Set(e.id, e)
+	n.graph.edges.Set(e.ID, e)
+	toNode.edgesTo.Set(e.ID, e)
+	n.edgesFrom.Set(e.ID, e)
 	return e, nil
 }
 
 // RemoveEdge removes an edge from the current node by edgeID
-func (n *Node[T]) RemoveEdge(edgeID string) {
+func (n *GraphNode[N]) RemoveEdge(edgeID string) {
 	n.graph.mu.Lock()
 	defer n.graph.mu.Unlock()
 	n.removeEdge(edgeID)
 }
 
-func (n *Node[T]) removeEdge(edgeID string) {
+func (n *GraphNode[N]) removeEdge(edgeID string) {
 	edge, ok := n.graph.edges.Get(edgeID)
 	if !ok {
 		return
@@ -132,264 +121,234 @@ func (n *Node[T]) removeEdge(edgeID string) {
 	n.graph.edges.Delete(edgeID)
 	n.edgesFrom.Delete(edgeID)
 	n.edgesTo.Delete(edgeID)
-	n.graph.viz.DeleteEdge(edge.edge)
+	if edge.edge != nil {
+		n.graph.viz.DeleteEdge(edge.edge)
+	}
 }
 
 // Remove removes the current node from the graph
-func (n *Node[T]) Remove() error {
+func (n *GraphNode[N]) Remove() error {
 	n.graph.mu.Lock()
 	defer n.graph.mu.Unlock()
-	n.edgesTo.Range(func(key string, edge *Edge[T]) bool {
-		n.removeEdge(edge.id)
+	n.edgesTo.Range(func(key string, edge *GraphEdge[N]) bool {
+		n.removeEdge(edge.ID)
 		return true
 	})
-	n.edgesFrom.Range(func(key string, edge *Edge[T]) bool {
-		n.removeEdge(edge.id)
+	n.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+		n.removeEdge(edge.ID)
 		return true
 	})
-	n.graph.nodes.Delete(n.id)
+	n.graph.nodes.Delete(n.Value.ID())
 	n.graph.viz.DeleteNode(n.node)
 	return nil
 }
 
 // Graph returns the graph the node belongs to
-func (n *Node[T]) Graph() *Graph[T] {
+func (n *GraphNode[N]) Graph() *Graph[N] {
 	return n.graph
 }
 
 // Graph is a concurrency safe, mutable, in-memory directed graph
-type Graph[T any] struct {
-	nodes *hashMap[*Node[T]]
-	edges *hashMap[*Edge[T]]
+type Graph[N Node] struct {
+	nodes *HashMap[*GraphNode[N]]
+	edges *HashMap[*GraphEdge[N]]
 	gviz  *graphviz.Graphviz
 	viz   *cgraph.Graph
 	mu    sync.RWMutex
 }
 
 // NewGraph creates a new in-memory Graph instance
-func NewGraph[T any](nodes ...*Node[T]) *Graph[T] {
-	g := &Graph[T]{
-		nodes: newMap[*Node[T]](),
-		edges: newMap[*Edge[T]](),
+func NewGraph[N Node](nodes ...*GraphNode[N]) *Graph[N] {
+	g := &Graph[N]{
+		nodes: NewHashMap[*GraphNode[N]](),
+		edges: NewHashMap[*GraphEdge[N]](),
 		gviz:  graphviz.New(),
 	}
 	graph, _ := g.gviz.Graph()
 	g.viz = graph
 	for _, node := range nodes {
-		g.SetNode(node)
+		g.SetNode(node.Value)
 	}
 	for _, node := range nodes {
-		node.edgesFrom.Range(func(key string, edge *Edge[T]) bool {
-			node.SetEdge(edge.id, edge.To.ID(), edge.Attributes)
+		node.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+			if _, err := node.SetEdge(edge.To, edge.Relationship, edge.Metadata); err != nil {
+				panic(err)
+			}
 			return true
 		})
 	}
 	return g
 }
 
-// SetNode adds a node to the graph - it will generate a unique ID for the node
-func (g *Graph[T]) AddNode(value T) *Node[T] {
-	node := &Node[T]{
-		Value:     value,
-		id:        uniqueID(),
-		graph:     g,
-		edgesTo:   newMap[*Edge[T]](),
-		edgesFrom: newMap[*Edge[T]](),
-	}
-	g.SetNode(node)
-	return node
-}
-
 // SetNode sets a node in the graph - it will use the node's ID as the key and overwrite any existing node with the same ID
-func (g *Graph[T]) SetNode(node *Node[T]) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if node.edgesFrom == nil {
-		node.edgesFrom = newMap[*Edge[T]]()
+func (g *Graph[N]) SetNode(node N) *GraphNode[N] {
+	n := &GraphNode[N]{
+		Value:     node,
+		edgesTo:   NewHashMap[*GraphEdge[N]](),
+		edgesFrom: NewHashMap[*GraphEdge[N]](),
+		graph:     g,
 	}
-	if node.edgesTo == nil {
-		node.edgesTo = newMap[*Edge[T]]()
+	g.nodes.Set(node.ID(), n)
+	gn, err := g.viz.CreateNode(node.ID())
+	if err != nil {
+		panic(err)
 	}
-	node.graph = g
-	if node.edgesFrom == nil {
-		node.edgesFrom = newMap[*Edge[T]]()
-	}
-	g.nodes.Set(node.id, node)
-	n, _ := g.viz.CreateNode(node.id)
-	n.SetLabel(node.id)
+	gn.SetLabel(node.ID())
+	n.node = gn
+	return n
 }
 
 // HasNode returns true if the node with the given id exists in the graph
-func (g *Graph[T]) HasNode(id string) bool {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+func (g *Graph[N]) HasNode(id string) bool {
 	_, ok := g.nodes.Get(id)
 	return ok
 }
 
 // HasEdge returns true if the edge with the given id exists in the graph
-func (g *Graph[T]) HasEdge(id string) bool {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+func (g *Graph[N]) HasEdge(id string) bool {
 	_, ok := g.edges.Get(id)
 	return ok
 }
 
 // GetNode returns the node with the given id
-func (g *Graph[T]) GetNode(id string) (*Node[T], bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+func (g *Graph[N]) GetNode(id string) (*GraphNode[N], bool) {
 	val, ok := g.nodes.Get(id)
 	return val, ok
 }
 
+// Size returns the number of nodes and edges in the graph
+func (g *Graph[N]) Size() (int, int) {
+	return g.nodes.Len(), g.edges.Len()
+}
+
+// GetNodes returns all nodes in the graph
+func (g *Graph[N]) GetNodes() []*GraphNode[N] {
+	nodes := make([]*GraphNode[N], 0, g.nodes.Len())
+	g.nodes.Range(func(key string, val *GraphNode[N]) bool {
+		nodes = append(nodes, val)
+		return true
+	})
+	return nodes
+}
+
+// GetEdges returns all edges in the graph
+func (g *Graph[N]) GetEdges() []*GraphEdge[N] {
+	edges := make([]*GraphEdge[N], 0, g.edges.Len())
+	g.edges.Range(func(key string, val *GraphEdge[N]) bool {
+		edges = append(edges, val)
+		return true
+	})
+	return edges
+}
+
 // GetEdge returns the edge with the given id
-func (g *Graph[T]) GetEdge(id string) (*Edge[T], bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+func (g *Graph[N]) GetEdge(id string) (*GraphEdge[N], bool) {
 	val, ok := g.edges.Get(id)
 	return val, ok
 }
 
 // RemoveNode removes the node with the given id from the graph
-func (g *Graph[T]) RangeEdges(fn func(e *Edge[T]) bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	g.edges.Range(func(key string, val *Edge[T]) bool {
+func (g *Graph[N]) RangeEdges(fn func(e *GraphEdge[N]) bool) {
+	g.edges.Range(func(key string, val *GraphEdge[N]) bool {
 		return fn(val)
 	})
 }
 
 // RangeNodes iterates over all nodes in the graph
-func (g *Graph[T]) RangeNodes(fn func(n *Node[T]) bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	g.nodes.Range(func(key string, val *Node[T]) bool {
+func (g *Graph[N]) RangeNodes(fn func(n *GraphNode[N]) bool) {
+	g.nodes.Range(func(key string, val *GraphNode[N]) bool {
 		return fn(val)
 	})
 }
 
-// DFS executes a depth first search with the rootNode and edge type
-func (g *Graph[T]) DFS(rootNode string, fn func(nodestring *Node[T]) bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+// BFS executes a depth first search on the graph starting from the current node.
+// The reverse parameter determines whether the search is reversed or not.
+// The fn parameter is a function that is called on each node in the graph. If the function returns false, the search is stopped.
+func (g *Graph[N]) BFS(reverse bool, start *GraphNode[N], fn func(node *GraphNode[N]) bool) {
 	var visited = map[string]struct{}{}
-	stack := newStack[*Node[T]]()
-	root, ok := g.nodes.Get(rootNode)
-	if !ok {
-		return
-	}
-	g.dfs(false, root, stack, visited)
-	stack.Range(func(element *Node[T]) bool {
-		if element.ID() != rootNode {
+	q := NewQueue[*GraphNode[N]]()
+	g.bfs(reverse, start, nil, q, visited)
+	q.Range(func(element *GraphNode[N]) bool {
+		debugF("bfs: visiting %s\n", element.Value.ID())
+		if element.Value.ID() != start.Value.ID() {
 			return fn(element)
 		}
 		return true
 	})
 }
 
-// ReverseDFS executes a reverse depth first search with the rootNode and edge type
-func (g *Graph[T]) ReverseDFS(rootNode string, fn func(nodestring *Node[T]) bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+// DFS executes a depth first search on the graph starting from the current node.
+// The reverse parameter determines whether the search is reversed or not.
+// The fn parameter is a function that is called on each node in the graph. If the function returns false, the search is stopped.
+func (g *Graph[N]) DFS(reverse bool, start *GraphNode[N], fn func(node *GraphNode[N]) bool) {
 	var visited = map[string]struct{}{}
-	stack := newStack[*Node[T]]()
-	root, ok := g.nodes.Get(rootNode)
-	if !ok {
-		return
-	}
-	g.dfs(true, root, stack, visited)
-	stack.Range(func(element *Node[T]) bool {
-		if element.ID() != rootNode {
+	stack := NewStack[*GraphNode[N]]()
+	g.dfs(reverse, start, nil, stack, visited)
+	stack.Range(func(element *GraphNode[N]) bool {
+		if element.Value.ID() != start.Value.ID() {
 			return fn(element)
 		}
 		return true
 	})
 }
 
-func (g *Graph[T]) dfs(reverse bool, n *Node[T], stack *stack[*Node[T]], visited map[string]struct{}) {
-	if _, ok := visited[n.ID()]; !ok {
-		visited[n.ID()] = struct{}{}
-		stack.Push(n)
+func (g *Graph[N]) dfs(reverse bool, root, next *GraphNode[N], stack *Stack[*GraphNode[N]], visited map[string]struct{}) {
+	if next == nil {
+		next = root
+	}
+	if _, ok := visited[next.Value.ID()]; !ok {
+		visited[next.Value.ID()] = struct{}{}
+		stack.Push(next)
 		if reverse {
-			n.edgesFrom.Range(func(key string, edge *Edge[T]) bool {
-				to, _ := g.nodes.Get(edge.From.ID())
-				g.dfs(reverse, to, stack, visited)
-				return true
+			next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+				to, _ := g.nodes.Get(edge.From.Value.ID())
+				g.dfs(reverse, root, to, stack, visited)
+				return len(visited) < g.nodes.Len()
 			})
 		} else {
-			n.edgesFrom.Range(func(key string, edge *Edge[T]) bool {
-				to, _ := g.nodes.Get(edge.To.ID())
-				g.dfs(reverse, to, stack, visited)
-				return true
+			next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+				to, _ := g.nodes.Get(edge.To.Value.ID())
+				g.dfs(reverse, root, to, stack, visited)
+				return len(visited) < g.nodes.Len()
 			})
 		}
 	}
+	debugF("dfs: finished visiting %s\n", next.Value.ID())
 }
 
-// BFS executes a depth first search with the rootNode and edge type
-func (g *Graph[T]) BFS(rootNode string, fn func(nodestring *Node[T]) bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	var visited = map[string]struct{}{}
-	q := newQueue[*Node[T]]()
-	root, ok := g.nodes.Get(rootNode)
-	if !ok {
-		return
+func (g *Graph[N]) bfs(reverse bool, root, next *GraphNode[N], q *Queue[*GraphNode[N]], visited map[string]struct{}) {
+	if next == nil {
+		next = root
 	}
-	g.bfs(false, root, q, visited)
-	q.Range(func(element *Node[T]) bool {
-		return fn(element)
-	})
-}
-
-// ReverseBFS executes a reverse depth first search with the rootNode and edge type
-func (g *Graph[T]) ReverseBFS(rootNode string, fn func(nodestring *Node[T]) bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	var visited = map[string]struct{}{}
-	q := newQueue[*Node[T]]()
-	root, ok := g.nodes.Get(rootNode)
-	if !ok {
-		return
-	}
-	g.bfs(true, root, q, visited)
-	q.Range(func(element *Node[T]) bool {
-		return fn(element)
-	})
-}
-
-func (g *Graph[T]) bfs(reverse bool, n *Node[T], q *queue[*Node[T]], visited map[string]struct{}) {
-	if _, ok := visited[n.ID()]; !ok {
-		visited[n.ID()] = struct{}{}
-		q.Enqueue(n)
+	if _, ok := visited[next.Value.ID()]; !ok {
+		visited[next.Value.ID()] = struct{}{}
+		q.Push(next)
 		if reverse {
-			n.edgesFrom.Range(func(key string, edge *Edge[T]) bool {
-				to, _ := g.nodes.Get(edge.From.ID())
-				g.bfs(reverse, to, q, visited)
-				return true
+			next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+				to, _ := g.nodes.Get(edge.From.Value.ID())
+				g.bfs(reverse, root, to, q, visited)
+				return len(visited) < g.nodes.Len()
 			})
 		} else {
-			n.edgesFrom.Range(func(key string, edge *Edge[T]) bool {
-				to, _ := g.nodes.Get(edge.To.ID())
-				g.bfs(reverse, to, q, visited)
-				return true
+			next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+				to, _ := g.nodes.Get(edge.To.Value.ID())
+				g.bfs(reverse, root, to, q, visited)
+				return len(visited) < g.nodes.Len()
 			})
 		}
 	}
+	debugF("bfs: finished visiting %s\n", next.Value.ID())
 }
 
 // TopologicalSort executes a topological sort
-func (g *Graph[T]) TopologicalSort(fn func(node *Node[T]) bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+func (g *Graph[N]) TopologicalSort(reverse bool, fn func(node *GraphNode[N]) bool) {
 	var (
 		permanent = map[string]struct{}{}
 		temp      = map[string]struct{}{}
-		stack     = newStack[string]()
+		stack     = NewStack[string]()
 	)
-	g.RangeNodes(func(n *Node[T]) bool {
-		g.topology(false, stack, n, permanent, temp)
+	g.RangeNodes(func(n *GraphNode[N]) bool {
+		g.topology(reverse, stack, n, permanent, temp)
 		return true
 	})
 	for stack.Len() > 0 {
@@ -404,54 +363,29 @@ func (g *Graph[T]) TopologicalSort(fn func(node *Node[T]) bool) {
 	}
 }
 
-// ReverseTopologicalSort executes a reverse topological sort
-func (g *Graph[T]) ReverseTopologicalSort(fn func(node *Node[T]) bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	var (
-		permanent = map[string]struct{}{}
-		temp      = map[string]struct{}{}
-		stack     = newStack[string]()
-	)
-	g.RangeNodes(func(n *Node[T]) bool {
-		g.topology(true, stack, n, permanent, temp)
-		return true
-	})
-	for stack.Len() > 0 {
-		this, ok := stack.Pop()
-		if !ok {
-			return
-		}
-		n, _ := g.nodes.Get(this)
-		if !fn(n) {
-			return
-		}
-	}
-}
-
-func (g *Graph[T]) topology(reverse bool, stack *stack[string], node *Node[T], permanent, temporary map[string]struct{}) {
-	if _, ok := permanent[node.id]; ok {
+func (g *Graph[N]) topology(reverse bool, stack *Stack[string], node *GraphNode[N], permanent, temporary map[string]struct{}) {
+	if _, ok := permanent[node.Value.ID()]; ok {
 		return
 	}
 	if reverse {
-		node.edgesFrom.Range(func(key string, edge *Edge[T]) bool {
+		node.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
 			g.topology(reverse, stack, edge.From, permanent, temporary)
 			return true
 		})
 	} else {
-		node.edgesFrom.Range(func(key string, edge *Edge[T]) bool {
+		node.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
 			g.topology(reverse, stack, edge.To, permanent, temporary)
 			return true
 		})
 	}
 
-	delete(temporary, node.id)
-	permanent[node.id] = struct{}{}
-	stack.Push(node.id)
+	delete(temporary, node.Value.ID())
+	permanent[node.Value.ID()] = struct{}{}
+	stack.Push(node.Value.ID())
 }
 
-// Vizualize returns a graphviz image
-func (g *Graph[T]) Vizualize() (image.Image, error) {
+// GraphViz returns a graphviz image
+func (g *Graph[N]) GraphViz() (image.Image, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	img, err := g.gviz.RenderImage(g.viz)
@@ -461,91 +395,89 @@ func (g *Graph[T]) Vizualize() (image.Image, error) {
 	return img, nil
 }
 
-// newMap creates a new generic hash map
-func newMap[T any]() *hashMap[T] {
-	return &hashMap[T]{
-		hashMap: map[string]T{},
+// NewHashMap creates a new generic hash map
+func NewHashMap[T any]() *HashMap[T] {
+	return &HashMap[T]{
+		HashMap: map[string]T{},
 		mu:      sync.RWMutex{},
 	}
 }
 
-// hashMap is a thread safe map
-type hashMap[T any] struct {
-	hashMap map[string]T
+// HashMap is a thread safe map
+type HashMap[T any] struct {
+	HashMap map[string]T
 	mu      sync.RWMutex
 }
 
 // Len returns the length of the map
-func (n *hashMap[T]) Len() int {
+func (n *HashMap[T]) Len() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return len(n.hashMap)
+	return len(n.HashMap)
 }
 
 // Get gets the value from the key
-func (n *hashMap[T]) Get(key string) (T, bool) {
+func (n *HashMap[T]) Get(key string) (T, bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	c, ok := n.hashMap[key]
+	c, ok := n.HashMap[key]
 	return c, ok
 }
 
 // Set sets the key to the value
-func (n *hashMap[T]) Set(key string, value T) {
+func (n *HashMap[T]) Set(key string, value T) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.hashMap[key] = value
+	n.HashMap[key] = value
 }
 
 // Range ranges over the map with a function until false is returned
-func (n *hashMap[T]) Range(f func(key string, value T) bool) {
+func (n *HashMap[T]) Range(f func(key string, value T) bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	for k, v := range n.hashMap {
+	for k, v := range n.HashMap {
 		f(k, v)
 	}
 }
 
 // Delete deletes the key from the map
-func (n *hashMap[T]) Delete(key string) {
+func (n *HashMap[T]) Delete(key string) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	delete(n.hashMap, key)
+	delete(n.HashMap, key)
 }
 
 // Exists returns true if the key exists in the map
-func (n *hashMap[T]) Exists(key string) bool {
+func (n *HashMap[T]) Exists(key string) bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	_, ok := n.hashMap[key]
+	_, ok := n.HashMap[key]
 	return ok
 }
 
 // Clear clears the map
-func (n *hashMap[T]) Clear() {
+func (n *HashMap[T]) Clear() {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	n.hashMap = map[string]T{}
+	n.HashMap = map[string]T{}
 }
 
-// newQueue returns a new queue with the given initial size.
-func newQueue[T any]() *queue[T] {
-	vals := &queue[T]{values: []T{}}
+// NewQueue returns a new Queue with the given initial size.
+func NewQueue[T any]() *Queue[T] {
+	vals := &Queue[T]{values: []T{}}
 	return vals
 }
 
-// queue is a basic FIFO queue based on a circular list that resizes as needed.
-type queue[T any] struct {
+// Queue is a basic FIFO Queue based on a circular list that resizes as needed.
+type Queue[T any] struct {
 	mu     sync.RWMutex
 	values []T
 }
 
-// Range executes a provided function once for each queue element until it returns false.
-func (q *queue[T]) Range(fn func(element T) bool) {
-	q.mu.RLock()
-	defer q.mu.RUnlock()
+// Range executes a provided function once for each Queue element until it returns false.
+func (q *Queue[T]) Range(fn func(element T) bool) {
 	for {
-		r, ok := q.Dequeue()
+		r, ok := q.Pop()
 		if !ok {
 			return
 		}
@@ -555,18 +487,18 @@ func (q *queue[T]) Range(fn func(element T) bool) {
 	}
 }
 
-// Enqueue adds an element to the end of the queue.
-func (q *queue[T]) Enqueue(val T) {
+// Push adds an element to the end of the Queue.
+func (q *Queue[T]) Push(val T) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.values = append(q.values, val)
 }
 
-// Dequeue removes and returns an element from the beginning of the queue.
-func (q *queue[T]) Dequeue() (T, bool) {
+// Pop removes and returns an element from the beginning of the Queue.
+func (q *Queue[T]) Pop() (T, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if q.Len() == 0 {
+	if len(q.values) == 0 {
 		return *new(T), false
 	}
 	val := q.values[0]
@@ -574,15 +506,15 @@ func (q *queue[T]) Dequeue() (T, bool) {
 	return val, true
 }
 
-// Len returns the number of elements in the queue.
-func (q *queue[T]) Len() int {
+// Len returns the number of elements in the Queue.
+func (q *Queue[T]) Len() int {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 	return len(q.values)
 }
 
-// Peek returns the first element of the queue without removing it.
-func (q *queue[T]) Peek() (T, bool) {
+// Peek returns the first element of the Queue without removing it.
+func (q *Queue[T]) Peek() (T, bool) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 	if q.Len() == 0 {
@@ -591,50 +523,41 @@ func (q *queue[T]) Peek() (T, bool) {
 	return q.values[0], true
 }
 
-// newStack returns a new stack
-func newStack[T any]() *stack[T] {
-	vals := &stack[T]{values: []T{}}
+// NewStack returns a new Stack
+func NewStack[T any]() *Stack[T] {
+	vals := &Stack[T]{values: []T{}}
 	return vals
 }
 
-// stack is a basic LIFO stack
-type stack[T any] struct {
+// Stack is a basic LIFO Stack
+type Stack[T any] struct {
 	mu     sync.RWMutex
 	values []T
 }
 
-// IsEmpty: check if stack is empty
-func (s *stack[T]) IsEmpty() bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s == nil || len(s.values) == 0
-}
-
-// Push a new value onto the stack
-func (s *stack[T]) Push(f T) {
+// Push a new value onto the Stack
+func (s *Stack[T]) Push(f T) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.values = append(s.values, f) // Simply append the new value to the end of the stack
+	s.values = append(s.values, f) // Simply append the new value to the end of the Stack
 }
 
-// Remove and return top element of stack. Return false if stack is empty.
-func (s *stack[T]) Pop() (T, bool) {
+// Remove and return top element of Stack. Return false if Stack is empty.
+func (s *Stack[T]) Pop() (T, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.IsEmpty() {
+	if len(s.values) == 0 {
 		return *new(T), false
 	} else {
 		index := len(s.values) - 1  // Get the index of the top most element.
 		element := s.values[index]  // Index into the slice and obtain the element.
-		s.values = s.values[:index] // Remove it from the stack by slicing it off.
+		s.values = s.values[:index] // Remove it from the Stack by slicing it off.
 		return element, true
 	}
 }
 
-// Range executes a provided function once for each stack element until it returns false.
-func (s *stack[T]) Range(fn func(element T) bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+// Range executes a provided function once for each Stack element until it returns false.
+func (s *Stack[T]) Range(fn func(element T) bool) {
 	for {
 		r, ok := s.Pop()
 		if !ok {
@@ -646,18 +569,18 @@ func (s *stack[T]) Range(fn func(element T) bool) {
 	}
 }
 
-// Len returns the number of elements in the stack.
-func (s *stack[T]) Len() int {
+// Len returns the number of elements in the Stack.
+func (s *Stack[T]) Len() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.values)
 }
 
-// Peek returns the top element of the stack without removing it. Return false if stack is empty.
-func (s *stack[T]) Peek() (T, bool) {
+// Peek returns the top element of the Stack without removing it. Return false if Stack is empty.
+func (s *Stack[T]) Peek() (T, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.IsEmpty() {
+	if len(s.values) == 0 {
 		return *new(T), false
 	} else {
 		index := len(s.values) - 1 // Get the index of the top most element.
@@ -666,12 +589,62 @@ func (s *stack[T]) Peek() (T, bool) {
 	}
 }
 
-// uniqueID returns a unique ID string
-func uniqueID() string {
-	b := make([]byte, 8)
-	_, err := rand.Read(b)
-	if err != nil {
-		log.Fatal(err)
+type Set[T comparable] struct {
+	mu     sync.RWMutex
+	values map[T]struct{}
+}
+
+// NewSet returns a new Set with the given initial size.
+func NewSet[T comparable]() *Set[T] {
+	vals := &Set[T]{values: map[T]struct{}{}}
+	return vals
+}
+
+// Add adds an element to the Set.
+func (s *Set[T]) Add(val T) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.values[val] = struct{}{}
+}
+
+// Remove removes an element from the Set.
+func (s *Set[T]) Remove(val T) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.values, val)
+}
+
+// Contains returns true if the Set contains the element.
+func (s *Set[T]) Contains(val T) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.values[val]
+	return ok
+}
+
+// Range executes a provided function once for each Set element until it returns false.
+func (s *Set[T]) Range(fn func(element T) bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for k := range s.values {
+		if !fn(k) {
+			return
+		}
 	}
-	return hex.EncodeToString(b)
+}
+
+// Len returns the number of elements in the Set.
+func (s *Set[T]) Len() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.values)
+}
+
+// debugF logs a message if the DAGGER_DEBUG environment variable is set.
+// It adds a stacktrace to the log message.
+func debugF(format string, a ...interface{}) {
+	if os.Getenv("DAGGER_DEBUG") != "" {
+		format = fmt.Sprintf("DEBUG: %s\n", format)
+		log.Printf(format, a...)
+	}
 }
