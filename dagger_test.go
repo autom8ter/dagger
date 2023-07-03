@@ -148,7 +148,7 @@ func TestGraph(t *testing.T) {
 }
 
 func TestQueue(t *testing.T) {
-	q := dagger.NewQueue[dagger.String]()
+	q := dagger.NewBlockingQueue[dagger.String](100)
 	for i := 0; i < 100; i++ {
 		q.Push(dagger.String(fmt.Sprintf("node-%d", i)))
 	}
@@ -184,6 +184,10 @@ func TestSet(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		ok := s.Contains(dagger.String(fmt.Sprintf("node-%d", i)))
 		assert.True(t, ok)
+	}
+	assert.Equal(t, s.Len(), 100)
+	for i := 0; i < 100; i++ {
+		s.Remove(dagger.String(fmt.Sprintf("node-%d", i)))
 	}
 	assert.Equal(t, s.Len(), 0)
 }
