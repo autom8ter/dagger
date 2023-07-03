@@ -370,8 +370,7 @@ func (g *DirectedGraph[N]) dfs(reverse bool, root, next *GraphNode[N], stack *St
 			})
 		} else {
 			next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
-				to, _ := g.nodes.Get(edge.To.Value.ID())
-				g.dfs(reverse, root, to, stack, visited)
+				g.dfs(reverse, root, edge.To, stack, visited)
 				return len(visited) < g.nodes.Len()
 			})
 		}
@@ -404,12 +403,11 @@ func (g *DirectedGraph[N]) bfs(wg *sync.WaitGroup, mu *sync.RWMutex, reverse boo
 			})
 		} else {
 			next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
-				to, _ := g.nodes.Get(edge.To.Value.ID())
 				wg.Add(1)
 				go func(to *GraphNode[N], visited map[string]struct{}) {
 					defer wg.Done()
 					g.bfs(wg, mu, reverse, root, to, q, visited)
-				}(to, visited)
+				}(edge.To, visited)
 				return len(visited) < g.nodes.Len()
 			})
 		}
@@ -419,25 +417,39 @@ func (g *DirectedGraph[N]) bfs(wg *sync.WaitGroup, mu *sync.RWMutex, reverse boo
 
 // Acyclic returns true if the graph contains no cycles.
 func (g *DirectedGraph[N]) Acyclic() bool {
-	return true
-}
-
-func (g *DirectedGraph[N]) acyclic(node *GraphNode[N], visited map[string]struct{}, onStack map[string]bool) bool {
-	visited[node.Value.ID()] = struct{}{}
-	onStack[node.Value.ID()] = true
-	node.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
-		to, _ := g.nodes.Get(edge.To.Value.ID())
-		if _, ok := visited[to.Value.ID()]; !ok {
-			if g.acyclic(to, visited, onStack) {
+	isAcyclic := false
+	g.nodes.Range(func(key string, node *GraphNode[N]) bool {
+		if node.edgesFrom.Len() > 0 {
+			visited := map[string]struct{}{}
+			onStack := map[string]bool{}
+			if g.isAcyclic(node, visited, onStack) {
+				isAcyclic = true
 				return false
 			}
-		} else if onStack[to.Value.ID()] {
-			return true
 		}
 		return true
 	})
-	onStack[node.Value.ID()] = false
-	return false
+	return isAcyclic
+}
+
+// isAcyclic returns true if the graph contains no cycles.
+func (g *DirectedGraph[N]) isAcyclic(node *GraphNode[N], visited map[string]struct{}, onStack map[string]bool) bool {
+	visited[node.Value.ID()] = struct{}{}
+	onStack[node.Value.ID()] = true
+	result := false
+	node.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+		if _, ok := visited[edge.To.Value.ID()]; !ok {
+			if g.isAcyclic(edge.To, visited, onStack) {
+				result = true
+				return false
+			}
+		} else if onStack[edge.To.Value.ID()] {
+			result = true
+			return false
+		}
+		return true
+	})
+	return result
 }
 
 // StronglyConnected returns the strongly connected components of the graph using Tarjan's algorithm.
