@@ -153,6 +153,55 @@ func (n *GraphNode[N]) Graph() *DirectedGraph[N] {
 	return n.graph
 }
 
+// Ancestors returns the ancestors of the current node
+func (n *GraphNode[N]) Ancestors(fn func(node *GraphNode[N]) bool) {
+	n.graph.mu.RLock()
+	defer n.graph.mu.RUnlock()
+	visited := make(map[string]bool)
+	n.ancestors(visited, fn)
+}
+
+func (n *GraphNode[N]) ancestors(visited map[string]bool, fn func(node *GraphNode[N]) bool) {
+	n.edgesTo.Range(func(key string, edge *GraphEdge[N]) bool {
+		if visited[edge.From.Value.ID()] {
+			return true
+		}
+		visited[edge.From.Value.ID()] = true
+		if !fn(edge.From) {
+			return false
+		}
+		edge.From.ancestors(visited, fn)
+		return true
+	})
+}
+
+// Descendants returns the descendants of the current node
+func (n *GraphNode[N]) Descendants(fn func(node *GraphNode[N]) bool) {
+	n.graph.mu.RLock()
+	defer n.graph.mu.RUnlock()
+	visited := make(map[string]bool)
+	n.descendants(visited, fn)
+}
+
+func (n *GraphNode[N]) descendants(visited map[string]bool, fn func(node *GraphNode[N]) bool) {
+	n.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+		if visited[edge.To.Value.ID()] {
+			return true
+		}
+		visited[edge.To.Value.ID()] = true
+		if !fn(edge.To) {
+			return false
+		}
+		edge.To.descendants(visited, fn)
+		return true
+	})
+}
+
+// String returns a string representation of the node
+func (n *GraphNode[N]) String() string {
+	return fmt.Sprintf("GraphNode[%T]:%s", n.Value, n.Value.ID())
+}
+
 // DirectedGraph is a concurrency safe, mutable, in-memory directed graph
 type DirectedGraph[N Node] struct {
 	nodes *HashMap[*GraphNode[N]]
@@ -370,8 +419,25 @@ func (g *DirectedGraph[N]) bfs(wg *sync.WaitGroup, mu *sync.RWMutex, reverse boo
 
 // Acyclic returns true if the graph contains no cycles.
 func (g *DirectedGraph[N]) Acyclic() bool {
-	// TODO: implement
 	return true
+}
+
+func (g *DirectedGraph[N]) acyclic(node *GraphNode[N], visited map[string]struct{}, onStack map[string]bool) bool {
+	visited[node.Value.ID()] = struct{}{}
+	onStack[node.Value.ID()] = true
+	node.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+		to, _ := g.nodes.Get(edge.To.Value.ID())
+		if _, ok := visited[to.Value.ID()]; !ok {
+			if g.acyclic(to, visited, onStack) {
+				return false
+			}
+		} else if onStack[to.Value.ID()] {
+			return true
+		}
+		return true
+	})
+	onStack[node.Value.ID()] = false
+	return false
 }
 
 // StronglyConnected returns the strongly connected components of the graph using Tarjan's algorithm.
@@ -518,31 +584,72 @@ func (g *DirectedGraph[N]) ShortestPath(source, target *GraphNode[N]) ([]*GraphN
 	return path, nil
 }
 
-// TopologicalSort executes a topological sort
-func (g *DirectedGraph[N]) TopologicalSort(reverse bool, fn func(node *GraphNode[N]) bool) error {
-	if !g.Acyclic() {
-		return fmt.Errorf("graph is not directed")
-	}
-	var (
-		permanent = map[string]struct{}{}
-		temp      = map[string]struct{}{}
-		stack     = NewStack[string]()
-	)
-	g.RangeNodes(func(n *GraphNode[N]) bool {
-		g.topology(reverse, stack, n, permanent, temp)
+// PredecessorMap returns a map of all predecessors of all nodes in the graph.
+func (d *DirectedGraph[N]) PredecessorMap() (map[*GraphNode[N]]map[*GraphNode[N]]*GraphEdge[N], error) {
+	m := make(map[*GraphNode[N]]map[*GraphNode[N]]*GraphEdge[N], d.nodes.Len())
+	d.nodes.Range(func(id string, node *GraphNode[N]) bool {
+		m[node] = make(map[*GraphNode[N]]*GraphEdge[N])
 		return true
 	})
-	for stack.Len() > 0 {
-		this, ok := stack.Pop()
-		if !ok {
-			return nil
+	d.edges.Range(func(id string, edge *GraphEdge[N]) bool {
+		if _, ok := m[edge.To]; !ok {
+			m[edge.To] = make(map[*GraphNode[N]]*GraphEdge[N])
 		}
-		n, _ := g.nodes.Get(this)
-		if !fn(n) {
-			return nil
+		m[edge.To][edge.From] = edge
+		return true
+	})
+	return m, nil
+}
+
+func (g *DirectedGraph[N]) TopologicalSort() ([]*GraphNode[N], error) {
+	if !g.Acyclic() {
+		return nil, fmt.Errorf("topological sort cannot be computed on cyclical graph")
+	}
+
+	count := g.nodes.Len()
+
+	predecessorMap, err := g.PredecessorMap()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get predecessor map: %w", err)
+	}
+
+	queue := NewQueue[*GraphNode[N]]()
+
+	for vertex, predecessors := range predecessorMap {
+		if len(predecessors) == 0 {
+			queue.Push(vertex)
 		}
 	}
-	return nil
+
+	order := make([]*GraphNode[N], 0, count)
+	visited := make(map[string]struct{}, count)
+	queue.Range(func(vertex *GraphNode[N]) bool {
+		currentVertex, ok := queue.Pop()
+		if !ok {
+			return false
+		}
+		if _, ok := visited[currentVertex.Value.ID()]; ok {
+			return true
+		}
+
+		order = append(order, currentVertex)
+		visited[currentVertex.Value.ID()] = struct{}{}
+
+		for vertex, predecessors := range predecessorMap {
+			delete(predecessors, currentVertex)
+
+			if len(predecessors) == 0 {
+				queue.Push(vertex)
+			}
+		}
+		return true
+	})
+
+	if len(order) != count {
+		return nil, fmt.Errorf("topological sort cannot be computed on graph with cycles %d != %d", len(order), count)
+	}
+
+	return order, nil
 }
 
 func (g *DirectedGraph[N]) topology(reverse bool, stack *Stack[string], node *GraphNode[N], permanent, temporary map[string]struct{}) {
@@ -614,7 +721,7 @@ func (n *HashMap[T]) Set(key string, value T) {
 }
 
 // Range ranges over the map with a function until false is returned
-func (n *HashMap[T]) Range(f func(key string, value T) bool) {
+func (n *HashMap[T]) Range(f func(id string, node T) bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	for k, v := range n.HashMap {
@@ -787,6 +894,69 @@ func (q *BlockingQueue[T]) Pop() (T, bool) {
 // Len returns the number of elements in the BlockingQueue.
 func (q *BlockingQueue[T]) Len() int {
 	return len(q.ch)
+}
+
+// Queue is a thread safe non-blocking queue
+type Queue[T any] struct {
+	mu     sync.RWMutex
+	values []T
+}
+
+// NewQueue returns a new Queue
+func NewQueue[T any]() *Queue[T] {
+	vals := &Queue[T]{values: []T{}}
+	return vals
+}
+
+// Push a new value onto the Queue
+func (s *Queue[T]) Push(f T) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.values = append(s.values, f) // Simply append the new value to the end of the Queue
+}
+
+// Pop and return top element of Queue. Return false if Queue is empty.
+func (s *Queue[T]) Pop() (T, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.values) == 0 {
+		return *new(T), false
+	} else {
+		index := len(s.values) - 1
+		val := s.values[index]
+		s.values = s.values[:index]
+		return val, true
+	}
+}
+
+// Len returns the length of the queue
+func (s *Queue[T]) Len() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.values)
+}
+
+// Peek returns the next item in the queue without removing it
+func (s *Queue[T]) Peek() (T, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.values) == 0 {
+		return *new(T), false
+	}
+	return s.values[len(s.values)-1], true
+}
+
+// Range executes a provided function once for each Queue element until it returns false.
+func (q *Queue[T]) Range(fn func(element T) bool) {
+	for {
+		val, ok := q.Pop()
+		if !ok {
+			return
+		}
+		if !fn(val) {
+			return
+		}
+	}
 }
 
 // NewStack returns a new Stack

@@ -145,6 +145,24 @@ func TestGraph(t *testing.T) {
 		})
 		assert.Equal(t, 100, len(nodes))
 	})
+	t.Run("topo", func(t *testing.T) {
+		graph := dagger.NewGraph[dagger.String]()
+		lastNode := graph.SetNode(dagger.UniqueID("node"))
+		for i := 0; i < 100; i++ {
+			node := graph.SetNode(dagger.String(fmt.Sprintf("node-%d", i)))
+			edge, err := lastNode.SetEdge(node, "connected", map[string]string{
+				"weight": fmt.Sprintf("%d", i),
+			})
+			assert.Nil(t, err)
+			assert.NotNil(t, edge)
+		}
+		nc, ec := graph.Size()
+		t.Logf("nodes=%v edges=%v last node: %s", nc, ec, lastNode.Value.ID())
+		nodes := make([]*dagger.GraphNode[dagger.String], 0)
+		nodes, err := graph.TopologicalSort()
+		assert.NoError(t, err)
+		assert.Equal(t, 100, len(nodes))
+	})
 }
 
 func TestQueue(t *testing.T) {
@@ -190,4 +208,20 @@ func TestSet(t *testing.T) {
 		s.Remove(dagger.String(fmt.Sprintf("node-%d", i)))
 	}
 	assert.Equal(t, s.Len(), 0)
+}
+
+func TestNewPriorityQueue(t *testing.T) {
+	q := dagger.NewPriorityQueue[dagger.String]()
+	for i := 0; i < 100; i++ {
+		q.Push(dagger.String(fmt.Sprintf("node-%d", i)), float64(i))
+	}
+	assert.Equal(t, q.Len(), 100)
+	first, _ := q.Peek()
+	assert.EqualValues(t, first.ID(), dagger.String("node-0"))
+	for i := 0; i < 100; i++ {
+		v, ok := q.Pop()
+		assert.NotNil(t, v)
+		assert.True(t, ok)
+	}
+	assert.Equal(t, q.Len(), 0)
 }
