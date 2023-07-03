@@ -165,7 +165,7 @@ func TestGraph(t *testing.T) {
 	})
 }
 
-func TestQueue(t *testing.T) {
+func TestBlockingQueue(t *testing.T) {
 	q := dagger.NewBlockingQueue[dagger.String](100)
 	for i := 0; i < 100; i++ {
 		q.Push(dagger.String(fmt.Sprintf("node-%d", i)))
@@ -218,6 +218,20 @@ func TestNewPriorityQueue(t *testing.T) {
 	assert.Equal(t, q.Len(), 100)
 	first, _ := q.Peek()
 	assert.EqualValues(t, first.ID(), dagger.String("node-0"))
+	for i := 0; i < 100; i++ {
+		v, ok := q.Pop()
+		assert.NotNil(t, v)
+		assert.True(t, ok)
+	}
+	assert.Equal(t, q.Len(), 0)
+}
+
+func TestQueue(t *testing.T) {
+	q := dagger.NewQueue[dagger.String]()
+	for i := 0; i < 100; i++ {
+		q.Push(dagger.String(fmt.Sprintf("node-%d", i)))
+	}
+	assert.Equal(t, q.Len(), 100)
 	for i := 0; i < 100; i++ {
 		v, ok := q.Pop()
 		assert.NotNil(t, v)
