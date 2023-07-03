@@ -1,8 +1,10 @@
 package dagger_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/autom8ter/dagger"
 	"github.com/stretchr/testify/assert"
@@ -13,6 +15,8 @@ func init() {
 }
 
 func TestGraph(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	t.Run("set node", func(t *testing.T) {
 		graph := dagger.NewGraph[dagger.String]()
 		node := graph.SetNode(dagger.UniqueID("node"))
@@ -119,10 +123,11 @@ func TestGraph(t *testing.T) {
 		nc, ec := graph.Size()
 		t.Logf("nodes=%v edges=%v last node: %s", nc, ec, lastNode.Value.ID())
 		nodes := make([]*dagger.GraphNode[dagger.String], 0)
-		graph.BFS(false, lastNode, func(node *dagger.GraphNode[dagger.String]) bool {
+		assert.NoError(t, graph.BFS(ctx, false, lastNode, func(ctx context.Context, relationship string, node *dagger.GraphNode[dagger.String]) bool {
 			nodes = append(nodes, node)
 			return true
-		})
+		}))
+
 		assert.Equal(t, 100, len(nodes))
 	})
 	t.Run("dfs", func(t *testing.T) {
@@ -139,10 +144,11 @@ func TestGraph(t *testing.T) {
 		nc, ec := graph.Size()
 		t.Logf("nodes=%v edges=%v last node: %s", nc, ec, lastNode.Value.ID())
 		nodes := make([]*dagger.GraphNode[dagger.String], 0)
-		graph.DFS(false, lastNode, func(node *dagger.GraphNode[dagger.String]) bool {
+
+		assert.NoError(t, graph.DFS(ctx, false, lastNode, func(ctx context.Context, relationship string, node *dagger.GraphNode[dagger.String]) bool {
 			nodes = append(nodes, node)
 			return true
-		})
+		}))
 		assert.Equal(t, 100, len(nodes))
 	})
 	t.Run("topo", func(t *testing.T) {
