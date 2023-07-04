@@ -765,7 +765,9 @@ func (n *HashMap[T]) Range(f func(id string, node T) bool) {
 	data := n.data
 	n.mu.RUnlock()
 	for k, v := range data {
-		f(k, v)
+		if !f(k, v) {
+			return
+		}
 	}
 }
 
