@@ -1,4 +1,17 @@
-// Package dagger is a collection of generic, concurrency safe datastructures including a Directed Acyclic Graph and others.
+/*
+Package dagger is a collection of generic, concurrency safe datastructures including a Directed Acyclic Graph and others.
+Datastructures are implemented using generics in Go 1.18.
+Supported Datastructures:
+DAG: thread safe directed acyclic graph
+Queue: unbounded thread safe fifo queue
+Stack: unbounded thread safe lifo stack
+BoundedQueue: bounded thread safe fifo queue with a fixed capacity
+PriorityQueue: thread safe priority queue
+HashMap: thread safe hashmap
+Set: thread safe set
+ChannelGroup: thread safe group of channels for broadcasting 1 value to N channels
+MultiContext: thread safe context for coordinating the cancellation of multiple contexts
+*/
 package dagger
 
 import (
