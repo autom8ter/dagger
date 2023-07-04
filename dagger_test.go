@@ -3,6 +3,9 @@ package dagger_test
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,7 +14,7 @@ import (
 )
 
 func init() {
-	// os.Setenv("DAGGER_DEBUG", "true")
+	os.Setenv("DAGGER_DEBUG", "true")
 }
 
 func TestGraph(t *testing.T) {
@@ -151,7 +154,7 @@ func TestGraph(t *testing.T) {
 		}))
 		assert.Equal(t, 100, len(nodes))
 	})
-	t.Run("topo", func(t *testing.T) {
+	t.Run("acyclic", func(t *testing.T) {
 		graph := dagger.NewGraph[dagger.String]()
 		lastNode := graph.SetNode(dagger.UniqueID("node"))
 		for i := 0; i < 100; i++ {
@@ -164,15 +167,109 @@ func TestGraph(t *testing.T) {
 		}
 		nc, ec := graph.Size()
 		t.Logf("nodes=%v edges=%v last node: %s", nc, ec, lastNode.Value.ID())
-		nodes := make([]*dagger.GraphNode[dagger.String], 0)
-		nodes, err := graph.TopologicalSort()
-		assert.NoError(t, err)
-		assert.Equal(t, 100, len(nodes))
+		assert.True(t, graph.Acyclic())
 	})
+	t.Run("topological reverse sort", func(t *testing.T) {
+		graph := dagger.NewGraph[dagger.String]()
+		lastNode := graph.SetNode(dagger.UniqueID("node"))
+		for i := 0; i < 100; i++ {
+			node := graph.SetNode(dagger.String(fmt.Sprintf("node-%d", i)))
+			edge, err := lastNode.SetEdge(node, "connected", map[string]string{
+				"weight": fmt.Sprintf("%d", i),
+			})
+			assert.Nil(t, err)
+			assert.NotNil(t, edge)
+			lastNode = node
+		}
+		nc, ec := graph.Size()
+		assert.True(t, graph.Acyclic())
+		t.Logf("nodes=%v edges=%v last node: %s", nc, ec, lastNode.Value.ID())
+		nodes, err := graph.TopologicalSort(true)
+		assert.NoError(t, err)
+		var n *dagger.GraphNode[dagger.String]
+		for _, node := range nodes {
+			if n == nil {
+				n = node
+				continue
+			}
+			split := strings.Split(n.Value.ID(), "-")
+			lastNodeID, _ := strconv.Atoi(split[len(split)-1])
+			split = strings.Split(node.Value.ID(), "-")
+			nodeID, _ := strconv.Atoi(split[len(split)-1])
+			assert.LessOrEqual(t, lastNodeID, nodeID)
+			n = node
+		}
+		assert.Equal(t, 101, len(nodes))
+	})
+	t.Run("topological sort", func(t *testing.T) {
+		graph := dagger.NewGraph[dagger.String]()
+		lastNode := graph.SetNode(dagger.UniqueID("node"))
+		for i := 0; i < 100; i++ {
+			node := graph.SetNode(dagger.String(fmt.Sprintf("node-%d", i)))
+			edge, err := lastNode.SetEdge(node, "connected", map[string]string{
+				"weight": fmt.Sprintf("%d", i),
+			})
+			assert.Nil(t, err)
+			assert.NotNil(t, edge)
+			lastNode = node
+		}
+		nc, ec := graph.Size()
+		assert.True(t, graph.Acyclic())
+		t.Logf("nodes=%v edges=%v last node: %s", nc, ec, lastNode.Value.ID())
+		nodes, err := graph.TopologicalSort(false)
+		assert.NoError(t, err)
+		var n *dagger.GraphNode[dagger.String]
+		for _, node := range nodes {
+			if n == nil {
+				n = node
+				continue
+			}
+			split := strings.Split(n.Value.ID(), "-")
+			lastNodeID, _ := strconv.Atoi(split[len(split)-1])
+			split = strings.Split(node.Value.ID(), "-")
+			nodeID, _ := strconv.Atoi(split[len(split)-1])
+			assert.GreaterOrEqual(t, lastNodeID, nodeID)
+			n = node
+		}
+		assert.Equal(t, 101, len(nodes))
+	})
+	//t.Run("strongly connected", func(t *testing.T) {
+	//	graph := dagger.NewGraph[dagger.String]()
+	//	{
+	//		lastNode := graph.SetNode(dagger.UniqueID("node"))
+	//		for i := 0; i < 50; i++ {
+	//			node := graph.SetNode(dagger.String(fmt.Sprintf("node-%d", i)))
+	//			edge, err := lastNode.SetEdge(node, "connected", map[string]string{
+	//				"weight": fmt.Sprintf("%d", i),
+	//			})
+	//			assert.Nil(t, err)
+	//			assert.NotNil(t, edge)
+	//			lastNode = node
+	//		}
+	//	}
+	//	{
+	//		lastNode := graph.SetNode(dagger.UniqueID("node1"))
+	//		for i := 51; i < 100; i++ {
+	//			node := graph.SetNode(dagger.String(fmt.Sprintf("node-%d", i)))
+	//			edge, err := lastNode.SetEdge(node, "connected", map[string]string{
+	//				"weight": fmt.Sprintf("%d", i),
+	//			})
+	//			assert.Nil(t, err)
+	//			assert.NotNil(t, edge)
+	//			lastNode = node
+	//		}
+	//	}
+	//	assert.True(t, graph.Acyclic())
+	//	components, err := graph.StronglyConnected()
+	//	assert.NoError(t, err)
+	//	assert.Equal(t, 2, len(components))
+	//	bits, _ := json.MarshalIndent(components, "", "  ")
+	//	t.Logf("strongly connected components: %v", string(bits))
+	//})
 }
 
-func TestBlockingQueue(t *testing.T) {
-	q := dagger.NewBlockingQueue[dagger.String](100)
+func TestBoundedQueue(t *testing.T) {
+	q := dagger.NewBoundedQueue[dagger.String](100)
 	for i := 0; i < 100; i++ {
 		q.Push(dagger.String(fmt.Sprintf("node-%d", i)))
 	}
