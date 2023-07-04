@@ -1,3 +1,4 @@
+// Package dagger is a collection of generic, concurrency safe datastructures including a Directed Acyclic Graph and others.
 package dagger
 
 import (
@@ -10,6 +11,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -18,17 +20,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Node is a node in a graph
-type Node interface {
-	// ID returns the unique id of the node
-	ID() string
-}
-
-// String is a generic string with methods to satisfy various interfaces such as the Node interface
-type String string
-
 // UniqueID returns a unique identifier with the given prefix
-func UniqueID(prefix string) String {
+func UniqueID(prefix string) string {
 	b := make([]byte, 4)
 	_, err := rand.Read(b)
 	if err != nil {
@@ -37,63 +30,89 @@ func UniqueID(prefix string) String {
 	if prefix == "" {
 		prefix = "id"
 	}
-	return String(fmt.Sprintf("%s-%s", prefix, hex.EncodeToString(b)))
-}
-
-// ID returns the string
-func (s String) ID() string {
-	return string(s)
+	return fmt.Sprintf("%s-%s", prefix, hex.EncodeToString(b))
 }
 
 // GraphEdge is a relationship between two nodes
-type GraphEdge[N Node] struct {
+type GraphEdge[T any] struct {
 	// ID is the unique identifier of the edge
 	ID string `json:"id"`
 	// Metadata is the metadata of the edge
 	Metadata map[string]string `json:"metadata"`
 	// From returns the root node of the edge
-	From *GraphNode[N] `json:"from"`
+	From *GraphNode[T] `json:"from"`
 	// To returns the target node of the edge
-	To *GraphNode[N] `json:"to"`
+	To *GraphNode[T] `json:"to"`
 	// Relationship is the relationship between the two nodes
 	Relationship string `json:"relationship"`
 	edge         *cgraph.Edge
 }
 
 // GraphNode is a node in the graph. It can be connected to other nodes via edges.
-type GraphNode[N Node] struct {
-	// Value is the value of the node
-	Value     N
-	edgesFrom *HashMap[*GraphEdge[N]]
-	edgesTo   *HashMap[*GraphEdge[N]]
-	graph     *DirectedGraph[N]
+type GraphNode[T any] struct {
+	id        string
+	metadata  map[string]string
+	value     T
+	edgesFrom *HashMap[*GraphEdge[T]]
+	edgesTo   *HashMap[*GraphEdge[T]]
+	graph     *DAG[T]
 	node      *cgraph.Node
 }
 
+// ID returns the unique identifier of the node
+func (n *GraphNode[T]) ID() string {
+	return n.id
+}
+
+// Metadata returns the metadata of the node
+func (n *GraphNode[T]) Metadata() map[string]string {
+	return n.metadata
+}
+
+// Value returns the value of the node
+func (n *GraphNode[T]) Value() T {
+	return n.value
+}
+
+// SetMetadata sets the metadata of the node
+func (n *GraphNode[T]) SetMetadata(metadata map[string]string) {
+	n.metadata = metadata
+}
+
+// SetID sets the unique identifier of the node
+func (n *GraphNode[T]) SetID(id string) {
+	n.id = id
+}
+
+// SetValue sets the value of the node
+func (n *GraphNode[T]) SetValue(value T) {
+	n.value = value
+}
+
 // DFS performs a depth-first search on the graph starting from the current node
-func (n *GraphNode[N]) DFS(ctx context.Context, reverse bool, fn GraphSearchFunc[N]) error {
+func (n *GraphNode[T]) DFS(ctx context.Context, reverse bool, fn GraphSearchFunc[T]) error {
 	return n.graph.DFS(ctx, reverse, n, fn)
 }
 
 // BFS performs a breadth-first search on the graph starting from the current node
-func (n *GraphNode[N]) BFS(ctx context.Context, reverse bool, fn GraphSearchFunc[N]) error {
+func (n *GraphNode[T]) BFS(ctx context.Context, reverse bool, fn GraphSearchFunc[T]) error {
 	return n.graph.BFS(ctx, reverse, n, fn)
 }
 
 // EdgesFrom returns the edges pointing from the current node
-func (n *GraphNode[N]) EdgesFrom(fn func(e *GraphEdge[N]) bool) {
+func (n *GraphNode[T]) EdgesFrom(fn func(e *GraphEdge[T]) bool) {
 	n.graph.mu.RLock()
 	defer n.graph.mu.RUnlock()
-	n.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+	n.edgesFrom.Range(func(key string, edge *GraphEdge[T]) bool {
 		return fn(edge)
 	})
 }
 
 // EdgesTo returns the edges pointing to the current node
-func (n *GraphNode[N]) EdgesTo(fn func(e *GraphEdge[N]) bool) {
+func (n *GraphNode[T]) EdgesTo(fn func(e *GraphEdge[T]) bool) {
 	n.graph.mu.RLock()
 	defer n.graph.mu.RUnlock()
-	n.edgesTo.Range(func(key string, edge *GraphEdge[N]) bool {
+	n.edgesTo.Range(func(key string, edge *GraphEdge[T]) bool {
 		return fn(edge)
 	})
 }
@@ -102,14 +121,14 @@ func (n *GraphNode[N]) EdgesTo(fn func(e *GraphEdge[N]) bool) {
 // If the nodeID does not exist, an error is returned.
 // If the edgeID is empty, a unique id will be generated.
 // If the metadata is nil, an empty map will be used.
-func (n *GraphNode[N]) SetEdge(toNode *GraphNode[N], relationship string, metadata map[string]string) (*GraphEdge[N], error) {
+func (n *GraphNode[T]) SetEdge(toNode *GraphNode[T], relationship string, metadata map[string]string) (*GraphEdge[T], error) {
 	if metadata == nil {
 		metadata = make(map[string]string)
 	}
 	n.graph.mu.Lock()
 	defer n.graph.mu.Unlock()
-	e := &GraphEdge[N]{
-		ID:       strings.ReplaceAll(strings.ToLower(fmt.Sprintf("%s-(%s)-%s", n.Value.ID(), relationship, toNode.Value.ID())), " ", "-"),
+	e := &GraphEdge[T]{
+		ID:       strings.ReplaceAll(strings.ToLower(fmt.Sprintf("%s-(%s)-%s", n.id, relationship, toNode.id)), " ", "-"),
 		Metadata: metadata,
 		From:     n,
 		To:       toNode,
@@ -117,17 +136,42 @@ func (n *GraphNode[N]) SetEdge(toNode *GraphNode[N], relationship string, metada
 	n.graph.edges.Set(e.ID, e)
 	toNode.edgesTo.Set(e.ID, e)
 	n.edgesFrom.Set(e.ID, e)
+	if n.graph.options.vizualize {
+		ge, err := n.graph.viz.CreateEdge(e.ID, n.node, toNode.node)
+		if err != nil {
+			return nil, err
+		}
+		ge.SetLabel(e.ID)
+		if label, ok := metadata["label"]; ok {
+			ge.SetLabel(label)
+		}
+		if color, ok := metadata["color"]; ok {
+			ge.SetColor(color)
+		}
+		if fontColor, ok := metadata["fontcolor"]; ok {
+			ge.SetFontColor(fontColor)
+		}
+		if weight, ok := metadata["weight"]; ok {
+			weightFloat, _ := strconv.ParseFloat(weight, 64)
+			ge.SetWeight(weightFloat)
+		}
+		if penWidth, ok := metadata["penwidth"]; ok {
+			penWidthFloat, _ := strconv.ParseFloat(penWidth, 64)
+			ge.SetPenWidth(penWidthFloat)
+		}
+		e.edge = ge
+	}
 	return e, nil
 }
 
 // RemoveEdge removes an edge from the current node by edgeID
-func (n *GraphNode[N]) RemoveEdge(edgeID string) {
+func (n *GraphNode[T]) RemoveEdge(edgeID string) {
 	n.graph.mu.Lock()
 	defer n.graph.mu.Unlock()
 	n.removeEdge(edgeID)
 }
 
-func (n *GraphNode[N]) removeEdge(edgeID string) {
+func (n *GraphNode[T]) removeEdge(edgeID string) {
 	edge, ok := n.graph.edges.Get(edgeID)
 	if !ok {
 		return
@@ -141,41 +185,41 @@ func (n *GraphNode[N]) removeEdge(edgeID string) {
 }
 
 // Remove removes the current node from the graph
-func (n *GraphNode[N]) Remove() error {
-	n.graph.mu.Lock()
-	defer n.graph.mu.Unlock()
-	n.edgesTo.Range(func(key string, edge *GraphEdge[N]) bool {
+func (n *GraphNode[T]) Remove() error {
+	n.edgesTo.Range(func(key string, edge *GraphEdge[T]) bool {
 		n.removeEdge(edge.ID)
 		return true
 	})
-	n.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+	n.edgesFrom.Range(func(key string, edge *GraphEdge[T]) bool {
 		n.removeEdge(edge.ID)
 		return true
 	})
-	n.graph.nodes.Delete(n.Value.ID())
-	n.graph.viz.DeleteNode(n.node)
+	n.graph.nodes.Delete(n.id)
+	if n.graph.options.vizualize {
+		n.graph.viz.DeleteNode(n.node)
+	}
 	return nil
 }
 
 // DirectedGraph returns the graph the node belongs to
-func (n *GraphNode[N]) Graph() *DirectedGraph[N] {
+func (n *GraphNode[T]) Graph() *DAG[T] {
 	return n.graph
 }
 
 // Ancestors returns the ancestors of the current node
-func (n *GraphNode[N]) Ancestors(fn func(node *GraphNode[N]) bool) {
+func (n *GraphNode[T]) Ancestors(fn func(node *GraphNode[T]) bool) {
 	n.graph.mu.RLock()
 	defer n.graph.mu.RUnlock()
 	visited := make(map[string]bool)
 	n.ancestors(visited, fn)
 }
 
-func (n *GraphNode[N]) ancestors(visited map[string]bool, fn func(node *GraphNode[N]) bool) {
-	n.edgesTo.Range(func(key string, edge *GraphEdge[N]) bool {
-		if visited[edge.From.Value.ID()] {
+func (n *GraphNode[T]) ancestors(visited map[string]bool, fn func(node *GraphNode[T]) bool) {
+	n.edgesTo.Range(func(key string, edge *GraphEdge[T]) bool {
+		if visited[edge.From.id] {
 			return true
 		}
-		visited[edge.From.Value.ID()] = true
+		visited[edge.From.id] = true
 		if !fn(edge.From) {
 			return false
 		}
@@ -185,19 +229,19 @@ func (n *GraphNode[N]) ancestors(visited map[string]bool, fn func(node *GraphNod
 }
 
 // Descendants returns the descendants of the current node
-func (n *GraphNode[N]) Descendants(fn func(node *GraphNode[N]) bool) {
+func (n *GraphNode[T]) Descendants(fn func(node *GraphNode[T]) bool) {
 	n.graph.mu.RLock()
 	defer n.graph.mu.RUnlock()
 	visited := make(map[string]bool)
 	n.descendants(visited, fn)
 }
 
-func (n *GraphNode[N]) descendants(visited map[string]bool, fn func(node *GraphNode[N]) bool) {
-	n.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
-		if visited[edge.To.Value.ID()] {
+func (n *GraphNode[T]) descendants(visited map[string]bool, fn func(node *GraphNode[T]) bool) {
+	n.edgesFrom.Range(func(key string, edge *GraphEdge[T]) bool {
+		if visited[edge.To.id] {
 			return true
 		}
-		visited[edge.To.Value.ID()] = true
+		visited[edge.To.id] = true
 		if !fn(edge.To) {
 			return false
 		}
@@ -207,28 +251,28 @@ func (n *GraphNode[N]) descendants(visited map[string]bool, fn func(node *GraphN
 }
 
 // String returns a string representation of the node
-func (n *GraphNode[N]) String() string {
-	return fmt.Sprintf("GraphNode[%T]:%s", n.Value, n.Value.ID())
+func (n *GraphNode[T]) String() string {
+	return fmt.Sprintf("GraphNode[%T]:%s", n.value, n.id)
 }
 
-func (n *GraphNode[N]) IsConnectedTo(node *GraphNode[N]) bool {
+func (n *GraphNode[T]) IsConnectedTo(node *GraphNode[T]) bool {
 	n.graph.mu.RLock()
 	defer n.graph.mu.RUnlock()
 	return n.isConnectedTo(node)
 }
 
-func (n *GraphNode[N]) isConnectedTo(node *GraphNode[N]) bool {
+func (n *GraphNode[T]) isConnectedTo(node *GraphNode[T]) bool {
 	visited := make(map[string]bool)
 	return n.isConnectedToRecursive(node, visited)
 }
 
-func (n *GraphNode[N]) isConnectedToRecursive(node *GraphNode[N], visited map[string]bool) bool {
+func (n *GraphNode[T]) isConnectedToRecursive(node *GraphNode[T], visited map[string]bool) bool {
 	if n == node {
 		return true
 	}
-	visited[n.Value.ID()] = true
+	visited[n.id] = true
 	for _, edge := range n.edgesFrom.Values() {
-		if visited[edge.To.Value.ID()] {
+		if visited[edge.To.id] {
 			continue
 		}
 		if edge.To.isConnectedToRecursive(node, visited) {
@@ -239,82 +283,109 @@ func (n *GraphNode[N]) isConnectedToRecursive(node *GraphNode[N], visited map[st
 }
 
 // DirectedGraph is a concurrency safe, mutable, in-memory directed graph
-type DirectedGraph[N Node] struct {
-	nodes *HashMap[*GraphNode[N]]
-	edges *HashMap[*GraphEdge[N]]
-	gviz  *graphviz.Graphviz
-	viz   *cgraph.Graph
-	mu    sync.RWMutex
+type DAG[T any] struct {
+	nodes   *HashMap[*GraphNode[T]]
+	edges   *HashMap[*GraphEdge[T]]
+	gviz    *graphviz.Graphviz
+	viz     *cgraph.Graph
+	mu      sync.RWMutex
+	options *dagOpts
 }
 
-// NewGraph creates a new in-memory DirectedGraph instance
-func NewGraph[N Node](nodes ...*GraphNode[N]) *DirectedGraph[N] {
-	g := &DirectedGraph[N]{
-		nodes: NewHashMap[*GraphNode[N]](),
-		edges: NewHashMap[*GraphEdge[N]](),
-		gviz:  graphviz.New(),
+type dagOpts struct {
+	vizualize bool
+}
+
+// DagOpt is an option for configuring a DAG
+type DagOpt func(*dagOpts)
+
+// WithVizualization enables graphviz visualization on the DAG
+func WithVizualization() DagOpt {
+	return func(opts *dagOpts) {
+		opts.vizualize = true
 	}
-	graph, _ := g.gviz.Graph()
-	g.viz = graph
-	for _, node := range nodes {
-		g.SetNode(node.Value)
+}
+
+// NewDAG creates a new Directed Acyclic Graph instance
+func NewDAG[T any](opts ...DagOpt) (*DAG[T], error) {
+	var err error
+	options := &dagOpts{}
+	for _, opt := range opts {
+		opt(options)
 	}
-	for _, node := range nodes {
-		node.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
-			if _, err := node.SetEdge(edge.To, edge.Relationship, edge.Metadata); err != nil {
-				panic(err)
-			}
-			return true
-		})
+	g := &DAG[T]{
+		nodes:   NewHashMap[*GraphNode[T]](),
+		edges:   NewHashMap[*GraphEdge[T]](),
+		gviz:    graphviz.New(),
+		options: options,
 	}
-	return g
+	if options.vizualize {
+		graph, _ := g.gviz.Graph()
+		g.viz = graph
+	}
+	return g, err
 }
 
 // SetNode sets a node in the graph - it will use the node's ID as the key and overwrite any existing node with the same ID
-func (g *DirectedGraph[N]) SetNode(node N) *GraphNode[N] {
-	n := &GraphNode[N]{
-		Value:     node,
-		edgesTo:   NewHashMap[*GraphEdge[N]](),
-		edgesFrom: NewHashMap[*GraphEdge[N]](),
+func (g *DAG[T]) SetNode(id string, node T, metadata map[string]string) *GraphNode[T] {
+	if metadata == nil {
+		metadata = make(map[string]string)
+	}
+	n := &GraphNode[T]{
+		id:        id,
+		value:     node,
+		metadata:  metadata,
+		edgesTo:   NewHashMap[*GraphEdge[T]](),
+		edgesFrom: NewHashMap[*GraphEdge[T]](),
 		graph:     g,
 	}
-	g.nodes.Set(node.ID(), n)
-	gn, err := g.viz.CreateNode(node.ID())
-	if err != nil {
-		panic(err)
+	g.nodes.Set(id, n)
+	if g.options.vizualize {
+		gn, err := g.viz.CreateNode(id)
+		if err != nil {
+			panic(err)
+		}
+		gn.SetLabel(id)
+		if label, ok := metadata["label"]; ok {
+			gn.SetLabel(label)
+		}
+		if color, ok := metadata["color"]; ok {
+			gn.SetColor(color)
+		}
+
+		n.node = gn
 	}
-	gn.SetLabel(node.ID())
-	n.node = gn
+
 	return n
 }
 
 // HasNode returns true if the node with the given id exists in the graph
-func (g *DirectedGraph[N]) HasNode(id string) bool {
+func (g *DAG[T]) HasNode(id string) bool {
 	_, ok := g.nodes.Get(id)
 	return ok
 }
 
 // HasEdge returns true if the edge with the given id exists in the graph
-func (g *DirectedGraph[N]) HasEdge(id string) bool {
+func (g *DAG[T]) HasEdge(id string) bool {
 	_, ok := g.edges.Get(id)
 	return ok
 }
 
 // GetNode returns the node with the given id
-func (g *DirectedGraph[N]) GetNode(id string) (*GraphNode[N], bool) {
+func (g *DAG[T]) GetNode(id string) (*GraphNode[T], bool) {
 	val, ok := g.nodes.Get(id)
 	return val, ok
 }
 
 // Size returns the number of nodes and edges in the graph
-func (g *DirectedGraph[N]) Size() (int, int) {
+func (g *DAG[T]) Size() (int, int) {
 	return g.nodes.Len(), g.edges.Len()
 }
 
 // GetNodes returns all nodes in the graph
-func (g *DirectedGraph[N]) GetNodes() []*GraphNode[N] {
-	nodes := make([]*GraphNode[N], 0, g.nodes.Len())
-	g.nodes.Range(func(key string, val *GraphNode[N]) bool {
+func (g *DAG[T]) GetNodes() []*GraphNode[T] {
+	nodes := make([]*GraphNode[T], 0, g.nodes.Len())
+	g.nodes.Range(func(key string, val *GraphNode[T]) bool {
 		nodes = append(nodes, val)
 		return true
 	})
@@ -322,9 +393,9 @@ func (g *DirectedGraph[N]) GetNodes() []*GraphNode[N] {
 }
 
 // GetEdges returns all edges in the graph
-func (g *DirectedGraph[N]) GetEdges() []*GraphEdge[N] {
-	edges := make([]*GraphEdge[N], 0, g.edges.Len())
-	g.edges.Range(func(key string, val *GraphEdge[N]) bool {
+func (g *DAG[T]) GetEdges() []*GraphEdge[T] {
+	edges := make([]*GraphEdge[T], 0, g.edges.Len())
+	g.edges.Range(func(key string, val *GraphEdge[T]) bool {
 		edges = append(edges, val)
 		return true
 	})
@@ -332,37 +403,37 @@ func (g *DirectedGraph[N]) GetEdges() []*GraphEdge[N] {
 }
 
 // GetEdge returns the edge with the given id
-func (g *DirectedGraph[N]) GetEdge(id string) (*GraphEdge[N], bool) {
+func (g *DAG[T]) GetEdge(id string) (*GraphEdge[T], bool) {
 	val, ok := g.edges.Get(id)
 	return val, ok
 }
 
-// RemoveNode removes the node with the given id from the graph
-func (g *DirectedGraph[N]) RangeEdges(fn func(e *GraphEdge[N]) bool) {
-	g.edges.Range(func(key string, val *GraphEdge[N]) bool {
+// RangeEdges iterates over all edges in the graph
+func (g *DAG[T]) RangeEdges(fn func(e *GraphEdge[T]) bool) {
+	g.edges.Range(func(key string, val *GraphEdge[T]) bool {
 		return fn(val)
 	})
 }
 
 // RangeNodes iterates over all nodes in the graph
-func (g *DirectedGraph[N]) RangeNodes(fn func(n *GraphNode[N]) bool) {
-	g.nodes.Range(func(key string, val *GraphNode[N]) bool {
+func (g *DAG[T]) RangeNodes(fn func(n *GraphNode[T]) bool) {
+	g.nodes.Range(func(key string, val *GraphNode[T]) bool {
 		return fn(val)
 	})
 }
 
 // GraphSearchFunc is a function that is called on each node in the graph during a search
-type GraphSearchFunc[N Node] func(ctx context.Context, relationship string, node *GraphNode[N]) bool
+type GraphSearchFunc[T any] func(ctx context.Context, relationship string, node *GraphNode[T]) bool
 
 // BFS executes a depth first search on the graph starting from the current node.
 // The reverse parameter determines whether the search is reversed or not.
 // The fn parameter is a function that is called on each node in the graph. If the function returns false, the search is stopped.
-func (g *DirectedGraph[N]) BFS(ctx context.Context, reverse bool, start *GraphNode[N], search GraphSearchFunc[N]) error {
+func (g *DAG[T]) BFS(ctx context.Context, reverse bool, start *GraphNode[T], search GraphSearchFunc[T]) error {
 	var visited = NewSet[string]()
-	stack := NewStack[*searchItem[N]]()
+	stack := NewStack[*searchItem[T]]()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	if err := g.breadthFirstSearch(ctx, &breadthFirstSearchState[N]{
+	if err := g.breadthFirstSearch(ctx, &breadthFirstSearchState[T]{
 		visited:      visited,
 		stack:        stack,
 		reverse:      reverse,
@@ -372,8 +443,8 @@ func (g *DirectedGraph[N]) BFS(ctx context.Context, reverse bool, start *GraphNo
 	}); err != nil {
 		return err
 	}
-	stack.Range(func(element *searchItem[N]) bool {
-		if element.node.Value.ID() != start.Value.ID() {
+	stack.Range(func(element *searchItem[T]) bool {
+		if element.node.id != start.id {
 			return search(ctx, element.relationship, element.node)
 		}
 		return true
@@ -384,14 +455,14 @@ func (g *DirectedGraph[N]) BFS(ctx context.Context, reverse bool, start *GraphNo
 // DFS executes a depth first search on the graph starting from the current node.
 // The reverse parameter determines whether the search is reversed or not.
 // The fn parameter is a function that is called on each node in the graph. If the function returns false, the search is stopped.
-func (g *DirectedGraph[N]) DFS(ctx context.Context, reverse bool, start *GraphNode[N], fn GraphSearchFunc[N]) error {
+func (g *DAG[T]) DFS(ctx context.Context, reverse bool, start *GraphNode[T], fn GraphSearchFunc[T]) error {
 	var visited = NewSet[string]()
-	queue := NewBoundedQueue[*searchItem[N]](0)
+	queue := NewBoundedQueue[*searchItem[T]](0)
 	var done = make(chan struct{}, 1)
 	egp1, ctx := errgroup.WithContext(ctx)
 	egp1.Go(func() error {
 		egp2, ctx := errgroup.WithContext(ctx)
-		if err := g.depthFirstSearch(ctx, &depthFirstSearchState[N]{
+		if err := g.depthFirstSearch(ctx, &depthFirstSearchState[T]{
 			visited:      visited,
 			egp:          egp2,
 			queue:        queue,
@@ -409,8 +480,8 @@ func (g *DirectedGraph[N]) DFS(ctx context.Context, reverse bool, start *GraphNo
 		return nil
 	})
 	egp1.Go(func() error {
-		queue.RangeUntil(func(element *searchItem[N]) bool {
-			if element.node.Value.ID() != start.Value.ID() {
+		queue.RangeUntil(func(element *searchItem[T]) bool {
+			if element.node.id != start.id {
 				return fn(ctx, element.relationship, element.node)
 			}
 			return true
@@ -424,36 +495,36 @@ func (g *DirectedGraph[N]) DFS(ctx context.Context, reverse bool, start *GraphNo
 }
 
 // searchItem is an item that is used in the search queue/stack in DFS/BFS
-type searchItem[N Node] struct {
-	node         *GraphNode[N]
+type searchItem[T any] struct {
+	node         *GraphNode[T]
 	relationship string
 }
 
-type breadthFirstSearchState[N Node] struct {
+type breadthFirstSearchState[T any] struct {
 	visited      *Set[string]
-	stack        *Stack[*searchItem[N]]
+	stack        *Stack[*searchItem[T]]
 	reverse      bool
-	root         *GraphNode[N]
-	next         *GraphNode[N]
+	root         *GraphNode[T]
+	next         *GraphNode[T]
 	relationship string
 }
 
-func (g *DirectedGraph[N]) breadthFirstSearch(ctx context.Context, state *breadthFirstSearchState[N]) error {
+func (g *DAG[T]) breadthFirstSearch(ctx context.Context, state *breadthFirstSearchState[T]) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if state.next == nil {
 		state.next = state.root
 	}
-	if !state.visited.Contains(state.next.Value.ID()) {
-		state.visited.Add(state.next.Value.ID())
-		state.stack.Push(&searchItem[N]{
+	if !state.visited.Contains(state.next.id) {
+		state.visited.Add(state.next.id)
+		state.stack.Push(&searchItem[T]{
 			node:         state.next,
 			relationship: state.relationship,
 		})
 		if state.reverse {
-			state.next.edgesTo.Range(func(key string, edge *GraphEdge[N]) bool {
-				g.breadthFirstSearch(ctx, &breadthFirstSearchState[N]{
+			state.next.edgesTo.Range(func(key string, edge *GraphEdge[T]) bool {
+				g.breadthFirstSearch(ctx, &breadthFirstSearchState[T]{
 					stack:        state.stack,
 					reverse:      state.reverse,
 					root:         state.root,
@@ -464,8 +535,8 @@ func (g *DirectedGraph[N]) breadthFirstSearch(ctx context.Context, state *breadt
 				return state.visited.Len() < g.nodes.Len() && ctx.Err() == nil
 			})
 		} else {
-			state.next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
-				g.breadthFirstSearch(ctx, &breadthFirstSearchState[N]{
+			state.next.edgesFrom.Range(func(key string, edge *GraphEdge[T]) bool {
+				g.breadthFirstSearch(ctx, &breadthFirstSearchState[T]{
 					visited:      state.visited,
 					stack:        state.stack,
 					reverse:      state.reverse,
@@ -480,33 +551,33 @@ func (g *DirectedGraph[N]) breadthFirstSearch(ctx context.Context, state *breadt
 	return ctx.Err()
 }
 
-type depthFirstSearchState[N Node] struct {
+type depthFirstSearchState[T any] struct {
 	visited      *Set[string]
 	egp          *errgroup.Group
-	queue        *BoundedQueue[*searchItem[N]]
+	queue        *BoundedQueue[*searchItem[T]]
 	reverse      bool
-	root         *GraphNode[N]
-	next         *GraphNode[N]
+	root         *GraphNode[T]
+	next         *GraphNode[T]
 	relationship string
 }
 
-func (g *DirectedGraph[N]) depthFirstSearch(ctx context.Context, state *depthFirstSearchState[N]) error {
+func (g *DAG[T]) depthFirstSearch(ctx context.Context, state *depthFirstSearchState[T]) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if state.next == nil {
 		state.next = state.root
 	}
-	if !state.visited.Contains(state.next.Value.ID()) {
-		state.visited.Add(state.next.Value.ID())
-		state.queue.Push(&searchItem[N]{
+	if !state.visited.Contains(state.next.id) {
+		state.visited.Add(state.next.id)
+		state.queue.Push(&searchItem[T]{
 			node:         state.next,
 			relationship: state.relationship,
 		})
 		if state.reverse {
 			state.egp.Go(func() error {
-				state.next.edgesTo.Range(func(key string, edge *GraphEdge[N]) bool {
-					g.depthFirstSearch(ctx, &depthFirstSearchState[N]{
+				state.next.edgesTo.Range(func(key string, edge *GraphEdge[T]) bool {
+					g.depthFirstSearch(ctx, &depthFirstSearchState[T]{
 						visited:      state.visited,
 						egp:          state.egp,
 						queue:        state.queue,
@@ -521,8 +592,8 @@ func (g *DirectedGraph[N]) depthFirstSearch(ctx context.Context, state *depthFir
 			})
 		} else {
 			state.egp.Go(func() error {
-				state.next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
-					g.depthFirstSearch(ctx, &depthFirstSearchState[N]{
+				state.next.edgesFrom.Range(func(key string, edge *GraphEdge[T]) bool {
+					g.depthFirstSearch(ctx, &depthFirstSearchState[T]{
 						visited:      state.visited,
 						egp:          state.egp,
 						queue:        state.queue,
@@ -541,9 +612,9 @@ func (g *DirectedGraph[N]) depthFirstSearch(ctx context.Context, state *depthFir
 }
 
 // Acyclic returns true if the graph contains no cycles.
-func (g *DirectedGraph[N]) Acyclic() bool {
+func (g *DAG[T]) Acyclic() bool {
 	isAcyclic := true
-	g.nodes.Range(func(key string, node *GraphNode[N]) bool {
+	g.nodes.Range(func(key string, node *GraphNode[T]) bool {
 		if node.edgesFrom.Len() > 0 {
 			visited := NewSet[string]()
 			onStack := NewSet[string]()
@@ -558,17 +629,17 @@ func (g *DirectedGraph[N]) Acyclic() bool {
 }
 
 // isAcyclic returns true if the graph contains no cycles.
-func (g *DirectedGraph[N]) isCyclic(node *GraphNode[N], visited *Set[string], onStack *Set[string]) bool {
-	visited.Add(node.Value.ID())
-	onStack.Add(node.Value.ID())
+func (g *DAG[T]) isCyclic(node *GraphNode[T], visited *Set[string], onStack *Set[string]) bool {
+	visited.Add(node.id)
+	onStack.Add(node.id)
 	result := false
-	node.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
-		if visited.Contains(edge.To.Value.ID()) {
+	node.edgesFrom.Range(func(key string, edge *GraphEdge[T]) bool {
+		if visited.Contains(edge.To.id) {
 			if g.isCyclic(edge.To, visited, onStack) {
 				result = true
 				return false
 			}
-		} else if onStack.Contains(edge.To.Value.ID()) {
+		} else if onStack.Contains(edge.To.id) {
 			result = true
 			return false
 		}
@@ -577,18 +648,18 @@ func (g *DirectedGraph[N]) isCyclic(node *GraphNode[N], visited *Set[string], on
 	return result
 }
 
-func (g *DirectedGraph[N]) TopologicalSort(reverse bool) ([]*GraphNode[N], error) {
+func (g *DAG[T]) TopologicalSort(reverse bool) ([]*GraphNode[T], error) {
 	if !g.Acyclic() {
 		return nil, fmt.Errorf("topological sort cannot be computed on cyclical graph")
 	}
-	stack := NewStack[*GraphNode[N]]()
+	stack := NewStack[*GraphNode[T]]()
 	permanent := NewSet[string]()
 	temporary := NewSet[string]()
-	g.nodes.Range(func(key string, node *GraphNode[N]) bool {
+	g.nodes.Range(func(key string, node *GraphNode[T]) bool {
 		g.topology(true, stack, node, permanent, temporary)
 		return true
 	})
-	var sorted []*GraphNode[N]
+	var sorted []*GraphNode[T]
 	for stack.Len() > 0 {
 		val, _ := stack.Pop()
 		sorted = append(sorted, val)
@@ -601,32 +672,35 @@ func (g *DirectedGraph[N]) TopologicalSort(reverse bool) ([]*GraphNode[N], error
 	return sorted, nil
 }
 
-func (g *DirectedGraph[N]) topology(reverse bool, stack *Stack[*GraphNode[N]], node *GraphNode[N], permanent, temporary *Set[string]) {
-	if permanent.Contains(node.Value.ID()) {
+func (g *DAG[T]) topology(reverse bool, stack *Stack[*GraphNode[T]], node *GraphNode[T], permanent, temporary *Set[string]) {
+	if permanent.Contains(node.id) {
 		return
 	}
-	if temporary.Contains(node.Value.ID()) {
+	if temporary.Contains(node.id) {
 		panic("not a DAG")
 	}
-	temporary.Add(node.Value.ID())
+	temporary.Add(node.id)
 	if reverse {
-		node.edgesTo.Range(func(key string, edge *GraphEdge[N]) bool {
+		node.edgesTo.Range(func(key string, edge *GraphEdge[T]) bool {
 			g.topology(reverse, stack, edge.From, permanent, temporary)
 			return true
 		})
 	} else {
-		node.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+		node.edgesFrom.Range(func(key string, edge *GraphEdge[T]) bool {
 			g.topology(reverse, stack, edge.From, permanent, temporary)
 			return true
 		})
 	}
-	temporary.Remove(node.Value.ID())
-	permanent.Add(node.Value.ID())
+	temporary.Remove(node.id)
+	permanent.Add(node.id)
 	stack.Push(node)
 }
 
 // GraphViz returns a graphviz image
-func (g *DirectedGraph[N]) GraphViz() (image.Image, error) {
+func (g *DAG[T]) GraphViz() (image.Image, error) {
+	if g.viz == nil {
+		return nil, fmt.Errorf("graphviz not configured")
+	}
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	img, err := g.gviz.RenderImage(g.viz)
@@ -639,29 +713,29 @@ func (g *DirectedGraph[N]) GraphViz() (image.Image, error) {
 // NewHashMap creates a new generic hash map
 func NewHashMap[T any]() *HashMap[T] {
 	return &HashMap[T]{
-		HashMap: map[string]T{},
-		mu:      sync.RWMutex{},
+		data: map[string]T{},
+		mu:   sync.RWMutex{},
 	}
 }
 
 // HashMap is a thread safe map
 type HashMap[T any] struct {
-	HashMap map[string]T
-	mu      sync.RWMutex
+	data map[string]T
+	mu   sync.RWMutex
 }
 
 // Len returns the length of the map
 func (n *HashMap[T]) Len() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return len(n.HashMap)
+	return len(n.data)
 }
 
 // Get gets the value from the key
 func (n *HashMap[T]) Get(key string) (T, bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	c, ok := n.HashMap[key]
+	c, ok := n.data[key]
 	return c, ok
 }
 
@@ -669,30 +743,31 @@ func (n *HashMap[T]) Get(key string) (T, bool) {
 func (n *HashMap[T]) Set(key string, value T) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.HashMap[key] = value
+	n.data[key] = value
 }
 
 // Range ranges over the map with a function until false is returned
 func (n *HashMap[T]) Range(f func(id string, node T) bool) {
 	n.mu.RLock()
-	defer n.mu.RUnlock()
-	for k, v := range n.HashMap {
+	data := n.data
+	n.mu.RUnlock()
+	for k, v := range data {
 		f(k, v)
 	}
 }
 
 // Delete deletes the key from the map
 func (n *HashMap[T]) Delete(key string) {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-	delete(n.HashMap, key)
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	delete(n.data, key)
 }
 
 // Exists returns true if the key exists in the map
 func (n *HashMap[T]) Exists(key string) bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	_, ok := n.HashMap[key]
+	_, ok := n.data[key]
 	return ok
 }
 
@@ -700,16 +775,16 @@ func (n *HashMap[T]) Exists(key string) bool {
 func (n *HashMap[T]) Clear() {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	n.HashMap = map[string]T{}
+	n.data = map[string]T{}
 }
 
 // Keys returns a copy of the keys in the map as a slice
 func (n *HashMap[T]) Keys() []string {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	keys := make([]string, len(n.HashMap))
+	keys := make([]string, len(n.data))
 	i := 0
-	for k := range n.HashMap {
+	for k := range n.data {
 		keys[i] = k
 		i++
 	}
@@ -720,9 +795,9 @@ func (n *HashMap[T]) Keys() []string {
 func (n *HashMap[T]) Values() []T {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	values := make([]T, len(n.HashMap))
+	values := make([]T, len(n.data))
 	i := 0
-	for _, v := range n.HashMap {
+	for _, v := range n.data {
 		values[i] = v
 		i++
 	}
@@ -1137,6 +1212,121 @@ func (s *Set[T]) Sort(lessFunc func(i T, j T) bool) []T {
 		return lessFunc(values[i], values[j])
 	})
 	return values
+}
+
+// ChannelGroup is a thread-safe group of channels. It is useful for broadcasting a value to multiple channels at once.
+type ChannelGroup[T any] struct {
+	ctx         *MultiContext
+	subscribers *HashMap[channelGroupState[T]]
+	wg          sync.WaitGroup
+}
+
+type channelGroupState[T any] struct {
+	ch  chan T
+	ctx context.Context
+}
+
+// NewChannelGroup returns a new ChannelGroup. The context is used to cancel all subscribers when the context is canceled.
+// A channel group is useful for broadcasting a value to multiple subscribers.
+func NewChannelGroup[T any](ctx context.Context) *ChannelGroup[T] {
+	return &ChannelGroup[T]{
+		ctx:         NewMultiContext(ctx),
+		subscribers: NewHashMap[channelGroupState[T]](),
+		wg:          sync.WaitGroup{},
+	}
+}
+
+// Send sends a value to all channels in the group.
+func (b *ChannelGroup[T]) Send(ctx context.Context, val T) {
+	b.wg.Add(1)
+	go func() {
+		defer b.wg.Done()
+		b.subscribers.Range(func(key string, state channelGroupState[T]) bool {
+			select {
+			case <-state.ctx.Done():
+				return false
+			case state.ch <- val:
+				return true
+			}
+		})
+	}()
+	return
+}
+
+// Channel returns a channel that will receive values from broadcasted values. The channel will be closed when the context is canceled.
+// This is a non-blocking operation.
+func (b *ChannelGroup[T]) Channel(ctx context.Context) <-chan T {
+	ch := make(chan T, 1)
+	id := UniqueID("subscriber")
+	b.subscribers.Set(id, channelGroupState[T]{
+		ch:  ch,
+		ctx: b.ctx.WithContext(ctx),
+	})
+	b.wg.Add(1)
+	go func() {
+		defer b.wg.Done()
+		<-b.ctx.WithContext(ctx).Done()
+		b.subscribers.Delete(id)
+		close(ch)
+	}()
+	return ch
+}
+
+// Len returns the number of subscribers.
+func (c *ChannelGroup[T]) Len() int {
+	return c.subscribers.Len()
+}
+
+// Close blocks until all subscribers have been removed and then closes the broadcast.
+func (b *ChannelGroup[T]) Close() {
+	b.ctx.Cancel()
+	b.wg.Wait()
+}
+
+// MultiContext is a context that can be used to combine contexts with a root context so they can be cancelled together.
+type MultiContext struct {
+	context.Context
+	mu      sync.Mutex
+	cancel  context.CancelFunc
+	cancels []context.CancelFunc
+}
+
+// NewMultiContext returns a new MultiContext.
+func NewMultiContext(ctx context.Context) *MultiContext {
+	ctx, cancel := context.WithCancel(ctx)
+	m := &MultiContext{
+		Context: ctx,
+		cancel:  cancel,
+	}
+	go func() {
+		select {
+		case <-m.Done():
+			m.mu.Lock()
+			for _, cancel := range m.cancels {
+				cancel()
+			}
+			m.mu.Unlock()
+		}
+	}()
+	return m
+}
+
+// WithContext returns a new context that is a child of the root context.
+// This context will be cancelled when the multi context is cancelled.
+func (m *MultiContext) WithContext(ctx context.Context) context.Context {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ctx, cancel := context.WithCancel(ctx)
+	m.cancels = append(m.cancels, cancel)
+	return ctx
+}
+
+// Cancel cancels all child contexts.
+func (m *MultiContext) Cancel() {
+	for _, cancel := range m.cancels {
+		cancel()
+	}
+	m.cancel()
 }
 
 // debugF logs a message if the DAGGER_DEBUG environment variable is set.

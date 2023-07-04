@@ -12,3 +12,7 @@ test: ## run unit tests
 
 coverage: ## show test coverage
 	go tool cover -func cover.out
+
+docs:
+	@echo "Generating docs..."
+	@gomarkdoc --output README.md .
