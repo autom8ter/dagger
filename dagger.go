@@ -1,15 +1,25 @@
 /*
 Package dagger is a collection of generic, concurrency safe datastructures including a Directed Acyclic Graph and others.
 Datastructures are implemented using generics in Go 1.18.
+
 Supported Datastructures:
+
 DAG: thread safe directed acyclic graph
+
 Queue: unbounded thread safe fifo queue
+
 Stack: unbounded thread safe lifo stack
+
 BoundedQueue: bounded thread safe fifo queue with a fixed capacity
+
 PriorityQueue: thread safe priority queue
+
 HashMap: thread safe hashmap
+
 Set: thread safe set
+
 ChannelGroup: thread safe group of channels for broadcasting 1 value to N channels
+
 MultiContext: thread safe context for coordinating the cancellation of multiple contexts
 */
 package dagger
@@ -112,20 +122,28 @@ func (n *GraphNode[T]) BFS(ctx context.Context, reverse bool, fn GraphSearchFunc
 	return n.graph.BFS(ctx, reverse, n, fn)
 }
 
-// EdgesFrom returns the edges pointing from the current node
-func (n *GraphNode[T]) EdgesFrom(fn func(e *GraphEdge[T]) bool) {
+// EdgesFrom iterates over the edges from the current node to other nodes with the given relationship.
+// If the relationship is empty, all relationships will be iterated over.
+func (n *GraphNode[T]) EdgesFrom(relationship string, fn func(e *GraphEdge[T]) bool) {
 	n.graph.mu.RLock()
 	defer n.graph.mu.RUnlock()
 	n.edgesFrom.Range(func(key string, edge *GraphEdge[T]) bool {
+		if relationship != "" && edge.Relationship != relationship {
+			return true
+		}
 		return fn(edge)
 	})
 }
 
-// EdgesTo returns the edges pointing to the current node
-func (n *GraphNode[T]) EdgesTo(fn func(e *GraphEdge[T]) bool) {
+// EdgesTo iterates over the edges from other nodes to the current node with the given relationship.
+// If the relationship is empty, all relationships will be iterated over.
+func (n *GraphNode[T]) EdgesTo(relationship string, fn func(e *GraphEdge[T]) bool) {
 	n.graph.mu.RLock()
 	defer n.graph.mu.RUnlock()
 	n.edgesTo.Range(func(key string, edge *GraphEdge[T]) bool {
+		if relationship != "" && edge.Relationship != relationship {
+			return true
+		}
 		return fn(edge)
 	})
 }
@@ -268,34 +286,27 @@ func (n *GraphNode[T]) String() string {
 	return fmt.Sprintf("GraphNode[%T]:%s", n.value, n.id)
 }
 
+// IsConnectedTo returns true if the current node is connected to the given node in any direction
 func (n *GraphNode[T]) IsConnectedTo(node *GraphNode[T]) bool {
-	n.graph.mu.RLock()
-	defer n.graph.mu.RUnlock()
-	return n.isConnectedTo(node)
-}
-
-func (n *GraphNode[T]) isConnectedTo(node *GraphNode[T]) bool {
-	visited := make(map[string]bool)
-	return n.isConnectedToRecursive(node, visited)
-}
-
-func (n *GraphNode[T]) isConnectedToRecursive(node *GraphNode[T], visited map[string]bool) bool {
-	if n == node {
+	var result bool
+	n.edgesFrom.Range(func(key string, edge *GraphEdge[T]) bool {
+		if edge.To == node {
+			result = true
+			return false
+		}
 		return true
-	}
-	visited[n.id] = true
-	for _, edge := range n.edgesFrom.Values() {
-		if visited[edge.To.id] {
-			continue
+	})
+	n.edgesTo.Range(func(key string, edge *GraphEdge[T]) bool {
+		if edge.From == node {
+			result = true
+			return false
 		}
-		if edge.To.isConnectedToRecursive(node, visited) {
-			return true
-		}
-	}
-	return false
+		return true
+	})
+	return result
 }
 
-// DirectedGraph is a concurrency safe, mutable, in-memory directed graph
+// DAG is a concurrency safe, mutable, in-memory directed graph
 type DAG[T any] struct {
 	nodes   *HashMap[*GraphNode[T]]
 	edges   *HashMap[*GraphEdge[T]]

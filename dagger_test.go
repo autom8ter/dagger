@@ -66,19 +66,19 @@ func TestGraph(t *testing.T) {
 		edge, err := node1.SetEdge(node2, "connected", map[string]string{})
 		assert.Nil(t, err)
 		assert.NotNil(t, edge)
-		node1.EdgesFrom(func(e *dagger.GraphEdge[string]) bool {
+		node1.EdgesFrom("", func(e *dagger.GraphEdge[string]) bool {
 			assert.Equal(t, e.ID, edge.ID)
 			return true
 		})
-		node1.EdgesTo(func(e *dagger.GraphEdge[string]) bool {
+		node1.EdgesTo("", func(e *dagger.GraphEdge[string]) bool {
 			assert.NotEqual(t, e.ID, edge.ID)
 			return true
 		})
-		node2.EdgesTo(func(e *dagger.GraphEdge[string]) bool {
+		node2.EdgesTo("", func(e *dagger.GraphEdge[string]) bool {
 			assert.Equal(t, e.ID, edge.ID)
 			return true
 		})
-		node2.EdgesFrom(func(e *dagger.GraphEdge[string]) bool {
+		node2.EdgesFrom("", func(e *dagger.GraphEdge[string]) bool {
 			assert.NotEqual(t, e.ID, edge.ID)
 			return true
 		})

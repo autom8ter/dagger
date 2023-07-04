@@ -6,21 +6,27 @@
 import "github.com/autom8ter/dagger/v3"
 ```
 
-Package dagger is a collection of generic, concurrency safe datastructures including a Directed Acyclic Graph and others.
+Package dagger is a collection of generic, concurrency safe datastructures including a Directed Acyclic Graph and others. Datastructures are implemented using generics in Go 1.18.
 
-```
-Datastructures are implemented using generics in Go 1.18.
 Supported Datastructures:
+
 DAG: thread safe directed acyclic graph
+
 Queue: unbounded thread safe fifo queue
+
 Stack: unbounded thread safe lifo stack
+
 BoundedQueue: bounded thread safe fifo queue with a fixed capacity
+
 PriorityQueue: thread safe priority queue
+
 HashMap: thread safe hashmap
+
 Set: thread safe set
+
 ChannelGroup: thread safe group of channels for broadcasting 1 value to N channels
+
 MultiContext: thread safe context for coordinating the cancellation of multiple contexts
-```
 
 ## Index
 
@@ -64,8 +70,8 @@ MultiContext: thread safe context for coordinating the cancellation of multiple 
   - [func \(n \*GraphNode\[T\]\) BFS\(ctx context.Context, reverse bool, fn GraphSearchFunc\[T\]\) error](<#GraphNode[T].BFS>)
   - [func \(n \*GraphNode\[T\]\) DFS\(ctx context.Context, reverse bool, fn GraphSearchFunc\[T\]\) error](<#GraphNode[T].DFS>)
   - [func \(n \*GraphNode\[T\]\) Descendants\(fn func\(node \*GraphNode\[T\]\) bool\)](<#GraphNode[T].Descendants>)
-  - [func \(n \*GraphNode\[T\]\) EdgesFrom\(fn func\(e \*GraphEdge\[T\]\) bool\)](<#GraphNode[T].EdgesFrom>)
-  - [func \(n \*GraphNode\[T\]\) EdgesTo\(fn func\(e \*GraphEdge\[T\]\) bool\)](<#GraphNode[T].EdgesTo>)
+  - [func \(n \*GraphNode\[T\]\) EdgesFrom\(relationship string, fn func\(e \*GraphEdge\[T\]\) bool\)](<#GraphNode[T].EdgesFrom>)
+  - [func \(n \*GraphNode\[T\]\) EdgesTo\(relationship string, fn func\(e \*GraphEdge\[T\]\) bool\)](<#GraphNode[T].EdgesTo>)
   - [func \(n \*GraphNode\[T\]\) Graph\(\) \*DAG\[T\]](<#GraphNode[T].Graph>)
   - [func \(n \*GraphNode\[T\]\) ID\(\) string](<#GraphNode[T].ID>)
   - [func \(n \*GraphNode\[T\]\) IsConnectedTo\(node \*GraphNode\[T\]\) bool](<#GraphNode[T].IsConnectedTo>)
@@ -132,7 +138,7 @@ MultiContext: thread safe context for coordinating the cancellation of multiple 
 
 
 <a name="UniqueID"></a>
-## func [UniqueID](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L37>)
+## func [UniqueID](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L47>)
 
 ```go
 func UniqueID(prefix string) string
@@ -141,7 +147,7 @@ func UniqueID(prefix string) string
 UniqueID returns a unique identifier with the given prefix
 
 <a name="BoundedQueue"></a>
-## type [BoundedQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L894-L897>)
+## type [BoundedQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L907-L910>)
 
 BoundedQueue is a basic FIFO BoundedQueue based on a buffered channel
 
@@ -152,7 +158,7 @@ type BoundedQueue[T any] struct {
 ```
 
 <a name="NewBoundedQueue"></a>
-### func [NewBoundedQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L901>)
+### func [NewBoundedQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L914>)
 
 ```go
 func NewBoundedQueue[T any](maxSize int) *BoundedQueue[T]
@@ -161,7 +167,7 @@ func NewBoundedQueue[T any](maxSize int) *BoundedQueue[T]
 NewBoundedQueue returns a new BoundedQueue with the given max size. When the max size is reached, the queue will block until a value is removed. If maxSize is 0, the queue will always block until a value is removed. The BoundedQueue is concurrent\-safe.
 
 <a name="BoundedQueue[T].Close"></a>
-### func \(\*BoundedQueue\[T\]\) [Close](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L944>)
+### func \(\*BoundedQueue\[T\]\) [Close](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L957>)
 
 ```go
 func (q *BoundedQueue[T]) Close()
@@ -170,7 +176,7 @@ func (q *BoundedQueue[T]) Close()
 Close closes the BoundedQueue channel.
 
 <a name="BoundedQueue[T].Len"></a>
-### func \(\*BoundedQueue\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L964>)
+### func \(\*BoundedQueue\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L977>)
 
 ```go
 func (q *BoundedQueue[T]) Len() int
@@ -179,7 +185,7 @@ func (q *BoundedQueue[T]) Len() int
 Len returns the number of elements in the BoundedQueue.
 
 <a name="BoundedQueue[T].Pop"></a>
-### func \(\*BoundedQueue\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L956>)
+### func \(\*BoundedQueue\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L969>)
 
 ```go
 func (q *BoundedQueue[T]) Pop() (T, bool)
@@ -188,7 +194,7 @@ func (q *BoundedQueue[T]) Pop() (T, bool)
 Pop removes and returns an element from the beginning of the BoundedQueue.
 
 <a name="BoundedQueue[T].Push"></a>
-### func \(\*BoundedQueue\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L951>)
+### func \(\*BoundedQueue\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L964>)
 
 ```go
 func (q *BoundedQueue[T]) Push(val T)
@@ -197,7 +203,7 @@ func (q *BoundedQueue[T]) Push(val T)
 Push adds an element to the end of the BoundedQueue.
 
 <a name="BoundedQueue[T].Range"></a>
-### func \(\*BoundedQueue\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L907>)
+### func \(\*BoundedQueue\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L920>)
 
 ```go
 func (q *BoundedQueue[T]) Range(fn func(element T) bool)
@@ -206,7 +212,7 @@ func (q *BoundedQueue[T]) Range(fn func(element T) bool)
 Range executes a provided function once for each BoundedQueue element until it returns false.
 
 <a name="BoundedQueue[T].RangeUntil"></a>
-### func \(\*BoundedQueue\[T\]\) [RangeUntil](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L927>)
+### func \(\*BoundedQueue\[T\]\) [RangeUntil](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L940>)
 
 ```go
 func (q *BoundedQueue[T]) RangeUntil(fn func(element T) bool, done chan struct{})
@@ -215,7 +221,7 @@ func (q *BoundedQueue[T]) RangeUntil(fn func(element T) bool, done chan struct{}
 RangeUntil executes a provided function once for each BoundedQueue element until it returns false or a value is sent to the done channel. Use this function when you want to continuously process items from the queue until a done signal is received.
 
 <a name="ChannelGroup"></a>
-## type [ChannelGroup](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1231-L1235>)
+## type [ChannelGroup](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1244-L1248>)
 
 ChannelGroup is a thread\-safe group of channels. It is useful for broadcasting a value to multiple channels at once.
 
@@ -226,7 +232,7 @@ type ChannelGroup[T any] struct {
 ```
 
 <a name="NewChannelGroup"></a>
-### func [NewChannelGroup](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1244>)
+### func [NewChannelGroup](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1257>)
 
 ```go
 func NewChannelGroup[T any](ctx context.Context) *ChannelGroup[T]
@@ -235,7 +241,7 @@ func NewChannelGroup[T any](ctx context.Context) *ChannelGroup[T]
 NewChannelGroup returns a new ChannelGroup. The context is used to cancel all subscribers when the context is canceled. A channel group is useful for broadcasting a value to multiple subscribers.
 
 <a name="ChannelGroup[T].Channel"></a>
-### func \(\*ChannelGroup\[T\]\) [Channel](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1271>)
+### func \(\*ChannelGroup\[T\]\) [Channel](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1284>)
 
 ```go
 func (b *ChannelGroup[T]) Channel(ctx context.Context) <-chan T
@@ -244,7 +250,7 @@ func (b *ChannelGroup[T]) Channel(ctx context.Context) <-chan T
 Channel returns a channel that will receive values from broadcasted values. The channel will be closed when the context is canceled. This is a non\-blocking operation.
 
 <a name="ChannelGroup[T].Close"></a>
-### func \(\*ChannelGroup\[T\]\) [Close](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1294>)
+### func \(\*ChannelGroup\[T\]\) [Close](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1307>)
 
 ```go
 func (b *ChannelGroup[T]) Close()
@@ -253,7 +259,7 @@ func (b *ChannelGroup[T]) Close()
 Close blocks until all subscribers have been removed and then closes the broadcast.
 
 <a name="ChannelGroup[T].Len"></a>
-### func \(\*ChannelGroup\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1289>)
+### func \(\*ChannelGroup\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1302>)
 
 ```go
 func (c *ChannelGroup[T]) Len() int
@@ -262,7 +268,7 @@ func (c *ChannelGroup[T]) Len() int
 Len returns the number of subscribers.
 
 <a name="ChannelGroup[T].Send"></a>
-### func \(\*ChannelGroup\[T\]\) [Send](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1253>)
+### func \(\*ChannelGroup\[T\]\) [Send](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1266>)
 
 ```go
 func (b *ChannelGroup[T]) Send(ctx context.Context, val T)
@@ -271,9 +277,9 @@ func (b *ChannelGroup[T]) Send(ctx context.Context, val T)
 Send sends a value to all channels in the group.
 
 <a name="DAG"></a>
-## type [DAG](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L299-L306>)
+## type [DAG](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L310-L317>)
 
-DirectedGraph is a concurrency safe, mutable, in\-memory directed graph
+DAG is a concurrency safe, mutable, in\-memory directed graph
 
 ```go
 type DAG[T any] struct {
@@ -282,7 +288,7 @@ type DAG[T any] struct {
 ```
 
 <a name="NewDAG"></a>
-### func [NewDAG](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L323>)
+### func [NewDAG](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L334>)
 
 ```go
 func NewDAG[T any](opts ...DagOpt) (*DAG[T], error)
@@ -291,7 +297,7 @@ func NewDAG[T any](opts ...DagOpt) (*DAG[T], error)
 NewDAG creates a new Directed Acyclic Graph instance
 
 <a name="DAG[T].Acyclic"></a>
-### func \(\*DAG\[T\]\) [Acyclic](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L628>)
+### func \(\*DAG\[T\]\) [Acyclic](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L639>)
 
 ```go
 func (g *DAG[T]) Acyclic() bool
@@ -300,7 +306,7 @@ func (g *DAG[T]) Acyclic() bool
 Acyclic returns true if the graph contains no cycles.
 
 <a name="DAG[T].BFS"></a>
-### func \(\*DAG\[T\]\) [BFS](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L444>)
+### func \(\*DAG\[T\]\) [BFS](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L455>)
 
 ```go
 func (g *DAG[T]) BFS(ctx context.Context, reverse bool, start *GraphNode[T], search GraphSearchFunc[T]) error
@@ -309,7 +315,7 @@ func (g *DAG[T]) BFS(ctx context.Context, reverse bool, start *GraphNode[T], sea
 BFS executes a depth first search on the graph starting from the current node. The reverse parameter determines whether the search is reversed or not. The fn parameter is a function that is called on each node in the graph. If the function returns false, the search is stopped.
 
 <a name="DAG[T].DFS"></a>
-### func \(\*DAG\[T\]\) [DFS](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L471>)
+### func \(\*DAG\[T\]\) [DFS](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L482>)
 
 ```go
 func (g *DAG[T]) DFS(ctx context.Context, reverse bool, start *GraphNode[T], fn GraphSearchFunc[T]) error
@@ -318,7 +324,7 @@ func (g *DAG[T]) DFS(ctx context.Context, reverse bool, start *GraphNode[T], fn 
 DFS executes a depth first search on the graph starting from the current node. The reverse parameter determines whether the search is reversed or not. The fn parameter is a function that is called on each node in the graph. If the function returns false, the search is stopped.
 
 <a name="DAG[T].GetEdge"></a>
-### func \(\*DAG\[T\]\) [GetEdge](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L419>)
+### func \(\*DAG\[T\]\) [GetEdge](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L430>)
 
 ```go
 func (g *DAG[T]) GetEdge(id string) (*GraphEdge[T], bool)
@@ -327,7 +333,7 @@ func (g *DAG[T]) GetEdge(id string) (*GraphEdge[T], bool)
 GetEdge returns the edge with the given id
 
 <a name="DAG[T].GetEdges"></a>
-### func \(\*DAG\[T\]\) [GetEdges](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L409>)
+### func \(\*DAG\[T\]\) [GetEdges](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L420>)
 
 ```go
 func (g *DAG[T]) GetEdges() []*GraphEdge[T]
@@ -336,7 +342,7 @@ func (g *DAG[T]) GetEdges() []*GraphEdge[T]
 GetEdges returns all edges in the graph
 
 <a name="DAG[T].GetNode"></a>
-### func \(\*DAG\[T\]\) [GetNode](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L388>)
+### func \(\*DAG\[T\]\) [GetNode](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L399>)
 
 ```go
 func (g *DAG[T]) GetNode(id string) (*GraphNode[T], bool)
@@ -345,7 +351,7 @@ func (g *DAG[T]) GetNode(id string) (*GraphNode[T], bool)
 GetNode returns the node with the given id
 
 <a name="DAG[T].GetNodes"></a>
-### func \(\*DAG\[T\]\) [GetNodes](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L399>)
+### func \(\*DAG\[T\]\) [GetNodes](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L410>)
 
 ```go
 func (g *DAG[T]) GetNodes() []*GraphNode[T]
@@ -354,7 +360,7 @@ func (g *DAG[T]) GetNodes() []*GraphNode[T]
 GetNodes returns all nodes in the graph
 
 <a name="DAG[T].GraphViz"></a>
-### func \(\*DAG\[T\]\) [GraphViz](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L713>)
+### func \(\*DAG\[T\]\) [GraphViz](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L724>)
 
 ```go
 func (g *DAG[T]) GraphViz() (image.Image, error)
@@ -363,7 +369,7 @@ func (g *DAG[T]) GraphViz() (image.Image, error)
 GraphViz returns a graphviz image
 
 <a name="DAG[T].HasEdge"></a>
-### func \(\*DAG\[T\]\) [HasEdge](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L382>)
+### func \(\*DAG\[T\]\) [HasEdge](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L393>)
 
 ```go
 func (g *DAG[T]) HasEdge(id string) bool
@@ -372,7 +378,7 @@ func (g *DAG[T]) HasEdge(id string) bool
 HasEdge returns true if the edge with the given id exists in the graph
 
 <a name="DAG[T].HasNode"></a>
-### func \(\*DAG\[T\]\) [HasNode](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L376>)
+### func \(\*DAG\[T\]\) [HasNode](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L387>)
 
 ```go
 func (g *DAG[T]) HasNode(id string) bool
@@ -381,7 +387,7 @@ func (g *DAG[T]) HasNode(id string) bool
 HasNode returns true if the node with the given id exists in the graph
 
 <a name="DAG[T].RangeEdges"></a>
-### func \(\*DAG\[T\]\) [RangeEdges](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L425>)
+### func \(\*DAG\[T\]\) [RangeEdges](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L436>)
 
 ```go
 func (g *DAG[T]) RangeEdges(fn func(e *GraphEdge[T]) bool)
@@ -390,7 +396,7 @@ func (g *DAG[T]) RangeEdges(fn func(e *GraphEdge[T]) bool)
 RangeEdges iterates over all edges in the graph
 
 <a name="DAG[T].RangeNodes"></a>
-### func \(\*DAG\[T\]\) [RangeNodes](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L432>)
+### func \(\*DAG\[T\]\) [RangeNodes](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L443>)
 
 ```go
 func (g *DAG[T]) RangeNodes(fn func(n *GraphNode[T]) bool)
@@ -399,7 +405,7 @@ func (g *DAG[T]) RangeNodes(fn func(n *GraphNode[T]) bool)
 RangeNodes iterates over all nodes in the graph
 
 <a name="DAG[T].SetNode"></a>
-### func \(\*DAG\[T\]\) [SetNode](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L343>)
+### func \(\*DAG\[T\]\) [SetNode](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L354>)
 
 ```go
 func (g *DAG[T]) SetNode(id string, node T, metadata map[string]string) *GraphNode[T]
@@ -408,7 +414,7 @@ func (g *DAG[T]) SetNode(id string, node T, metadata map[string]string) *GraphNo
 SetNode sets a node in the graph \- it will use the node's ID as the key and overwrite any existing node with the same ID
 
 <a name="DAG[T].Size"></a>
-### func \(\*DAG\[T\]\) [Size](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L394>)
+### func \(\*DAG\[T\]\) [Size](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L405>)
 
 ```go
 func (g *DAG[T]) Size() (int, int)
@@ -417,7 +423,7 @@ func (g *DAG[T]) Size() (int, int)
 Size returns the number of nodes and edges in the graph
 
 <a name="DAG[T].TopologicalSort"></a>
-### func \(\*DAG\[T\]\) [TopologicalSort](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L664>)
+### func \(\*DAG\[T\]\) [TopologicalSort](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L675>)
 
 ```go
 func (g *DAG[T]) TopologicalSort(reverse bool) ([]*GraphNode[T], error)
@@ -426,7 +432,7 @@ func (g *DAG[T]) TopologicalSort(reverse bool) ([]*GraphNode[T], error)
 
 
 <a name="DagOpt"></a>
-## type [DagOpt](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L313>)
+## type [DagOpt](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L324>)
 
 DagOpt is an option for configuring a DAG
 
@@ -435,7 +441,7 @@ type DagOpt func(*dagOpts)
 ```
 
 <a name="WithVizualization"></a>
-### func [WithVizualization](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L316>)
+### func [WithVizualization](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L327>)
 
 ```go
 func WithVizualization() DagOpt
@@ -444,7 +450,7 @@ func WithVizualization() DagOpt
 WithVizualization enables graphviz visualization on the DAG
 
 <a name="GraphEdge"></a>
-## type [GraphEdge](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L50-L62>)
+## type [GraphEdge](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L60-L72>)
 
 GraphEdge is a relationship between two nodes
 
@@ -465,7 +471,7 @@ type GraphEdge[T any] struct {
 ```
 
 <a name="GraphNode"></a>
-## type [GraphNode](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L65-L73>)
+## type [GraphNode](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L75-L83>)
 
 GraphNode is a node in the graph. It can be connected to other nodes via edges.
 
@@ -476,7 +482,7 @@ type GraphNode[T any] struct {
 ```
 
 <a name="GraphNode[T].Ancestors"></a>
-### func \(\*GraphNode\[T\]\) [Ancestors](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L223>)
+### func \(\*GraphNode\[T\]\) [Ancestors](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L241>)
 
 ```go
 func (n *GraphNode[T]) Ancestors(fn func(node *GraphNode[T]) bool)
@@ -485,7 +491,7 @@ func (n *GraphNode[T]) Ancestors(fn func(node *GraphNode[T]) bool)
 Ancestors returns the ancestors of the current node
 
 <a name="GraphNode[T].BFS"></a>
-### func \(\*GraphNode\[T\]\) [BFS](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L111>)
+### func \(\*GraphNode\[T\]\) [BFS](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L121>)
 
 ```go
 func (n *GraphNode[T]) BFS(ctx context.Context, reverse bool, fn GraphSearchFunc[T]) error
@@ -494,7 +500,7 @@ func (n *GraphNode[T]) BFS(ctx context.Context, reverse bool, fn GraphSearchFunc
 BFS performs a breadth\-first search on the graph starting from the current node
 
 <a name="GraphNode[T].DFS"></a>
-### func \(\*GraphNode\[T\]\) [DFS](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L106>)
+### func \(\*GraphNode\[T\]\) [DFS](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L116>)
 
 ```go
 func (n *GraphNode[T]) DFS(ctx context.Context, reverse bool, fn GraphSearchFunc[T]) error
@@ -503,7 +509,7 @@ func (n *GraphNode[T]) DFS(ctx context.Context, reverse bool, fn GraphSearchFunc
 DFS performs a depth\-first search on the graph starting from the current node
 
 <a name="GraphNode[T].Descendants"></a>
-### func \(\*GraphNode\[T\]\) [Descendants](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L245>)
+### func \(\*GraphNode\[T\]\) [Descendants](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L263>)
 
 ```go
 func (n *GraphNode[T]) Descendants(fn func(node *GraphNode[T]) bool)
@@ -512,25 +518,25 @@ func (n *GraphNode[T]) Descendants(fn func(node *GraphNode[T]) bool)
 Descendants returns the descendants of the current node
 
 <a name="GraphNode[T].EdgesFrom"></a>
-### func \(\*GraphNode\[T\]\) [EdgesFrom](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L116>)
+### func \(\*GraphNode\[T\]\) [EdgesFrom](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L127>)
 
 ```go
-func (n *GraphNode[T]) EdgesFrom(fn func(e *GraphEdge[T]) bool)
+func (n *GraphNode[T]) EdgesFrom(relationship string, fn func(e *GraphEdge[T]) bool)
 ```
 
-EdgesFrom returns the edges pointing from the current node
+EdgesFrom iterates over the edges from the current node to other nodes with the given relationship. If the relationship is empty, all relationships will be iterated over.
 
 <a name="GraphNode[T].EdgesTo"></a>
-### func \(\*GraphNode\[T\]\) [EdgesTo](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L125>)
+### func \(\*GraphNode\[T\]\) [EdgesTo](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L140>)
 
 ```go
-func (n *GraphNode[T]) EdgesTo(fn func(e *GraphEdge[T]) bool)
+func (n *GraphNode[T]) EdgesTo(relationship string, fn func(e *GraphEdge[T]) bool)
 ```
 
-EdgesTo returns the edges pointing to the current node
+EdgesTo iterates over the edges from other nodes to the current node with the given relationship. If the relationship is empty, all relationships will be iterated over.
 
 <a name="GraphNode[T].Graph"></a>
-### func \(\*GraphNode\[T\]\) [Graph](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L218>)
+### func \(\*GraphNode\[T\]\) [Graph](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L236>)
 
 ```go
 func (n *GraphNode[T]) Graph() *DAG[T]
@@ -539,7 +545,7 @@ func (n *GraphNode[T]) Graph() *DAG[T]
 DirectedGraph returns the graph the node belongs to
 
 <a name="GraphNode[T].ID"></a>
-### func \(\*GraphNode\[T\]\) [ID](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L76>)
+### func \(\*GraphNode\[T\]\) [ID](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L86>)
 
 ```go
 func (n *GraphNode[T]) ID() string
@@ -548,16 +554,16 @@ func (n *GraphNode[T]) ID() string
 ID returns the unique identifier of the node
 
 <a name="GraphNode[T].IsConnectedTo"></a>
-### func \(\*GraphNode\[T\]\) [IsConnectedTo](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L271>)
+### func \(\*GraphNode\[T\]\) [IsConnectedTo](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L290>)
 
 ```go
 func (n *GraphNode[T]) IsConnectedTo(node *GraphNode[T]) bool
 ```
 
-
+IsConnectedTo returns true if the current node is connected to the given node in any direction
 
 <a name="GraphNode[T].Metadata"></a>
-### func \(\*GraphNode\[T\]\) [Metadata](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L81>)
+### func \(\*GraphNode\[T\]\) [Metadata](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L91>)
 
 ```go
 func (n *GraphNode[T]) Metadata() map[string]string
@@ -566,7 +572,7 @@ func (n *GraphNode[T]) Metadata() map[string]string
 Metadata returns the metadata of the node
 
 <a name="GraphNode[T].Remove"></a>
-### func \(\*GraphNode\[T\]\) [Remove](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L201>)
+### func \(\*GraphNode\[T\]\) [Remove](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L219>)
 
 ```go
 func (n *GraphNode[T]) Remove() error
@@ -575,7 +581,7 @@ func (n *GraphNode[T]) Remove() error
 Remove removes the current node from the graph
 
 <a name="GraphNode[T].RemoveEdge"></a>
-### func \(\*GraphNode\[T\]\) [RemoveEdge](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L181>)
+### func \(\*GraphNode\[T\]\) [RemoveEdge](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L199>)
 
 ```go
 func (n *GraphNode[T]) RemoveEdge(edgeID string)
@@ -584,7 +590,7 @@ func (n *GraphNode[T]) RemoveEdge(edgeID string)
 RemoveEdge removes an edge from the current node by edgeID
 
 <a name="GraphNode[T].SetEdge"></a>
-### func \(\*GraphNode\[T\]\) [SetEdge](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L137>)
+### func \(\*GraphNode\[T\]\) [SetEdge](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L155>)
 
 ```go
 func (n *GraphNode[T]) SetEdge(toNode *GraphNode[T], relationship string, metadata map[string]string) (*GraphEdge[T], error)
@@ -593,7 +599,7 @@ func (n *GraphNode[T]) SetEdge(toNode *GraphNode[T], relationship string, metada
 SetEdge sets an edge from the current node to the node with the given nodeID. If the nodeID does not exist, an error is returned. If the edgeID is empty, a unique id will be generated. If the metadata is nil, an empty map will be used.
 
 <a name="GraphNode[T].SetID"></a>
-### func \(\*GraphNode\[T\]\) [SetID](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L96>)
+### func \(\*GraphNode\[T\]\) [SetID](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L106>)
 
 ```go
 func (n *GraphNode[T]) SetID(id string)
@@ -602,7 +608,7 @@ func (n *GraphNode[T]) SetID(id string)
 SetID sets the unique identifier of the node
 
 <a name="GraphNode[T].SetMetadata"></a>
-### func \(\*GraphNode\[T\]\) [SetMetadata](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L91>)
+### func \(\*GraphNode\[T\]\) [SetMetadata](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L101>)
 
 ```go
 func (n *GraphNode[T]) SetMetadata(metadata map[string]string)
@@ -611,7 +617,7 @@ func (n *GraphNode[T]) SetMetadata(metadata map[string]string)
 SetMetadata sets the metadata of the node
 
 <a name="GraphNode[T].SetValue"></a>
-### func \(\*GraphNode\[T\]\) [SetValue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L101>)
+### func \(\*GraphNode\[T\]\) [SetValue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L111>)
 
 ```go
 func (n *GraphNode[T]) SetValue(value T)
@@ -620,7 +626,7 @@ func (n *GraphNode[T]) SetValue(value T)
 SetValue sets the value of the node
 
 <a name="GraphNode[T].String"></a>
-### func \(\*GraphNode\[T\]\) [String](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L267>)
+### func \(\*GraphNode\[T\]\) [String](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L285>)
 
 ```go
 func (n *GraphNode[T]) String() string
@@ -629,7 +635,7 @@ func (n *GraphNode[T]) String() string
 String returns a string representation of the node
 
 <a name="GraphNode[T].Value"></a>
-### func \(\*GraphNode\[T\]\) [Value](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L86>)
+### func \(\*GraphNode\[T\]\) [Value](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L96>)
 
 ```go
 func (n *GraphNode[T]) Value() T
@@ -638,7 +644,7 @@ func (n *GraphNode[T]) Value() T
 Value returns the value of the node
 
 <a name="GraphSearchFunc"></a>
-## type [GraphSearchFunc](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L439>)
+## type [GraphSearchFunc](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L450>)
 
 GraphSearchFunc is a function that is called on each node in the graph during a search
 
@@ -647,7 +653,7 @@ type GraphSearchFunc[T any] func(ctx context.Context, relationship string, node 
 ```
 
 <a name="HashMap"></a>
-## type [HashMap](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L735-L738>)
+## type [HashMap](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L746-L749>)
 
 HashMap is a thread safe map
 
@@ -658,7 +664,7 @@ type HashMap[T any] struct {
 ```
 
 <a name="NewHashMap"></a>
-### func [NewHashMap](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L727>)
+### func [NewHashMap](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L738>)
 
 ```go
 func NewHashMap[T any]() *HashMap[T]
@@ -667,7 +673,7 @@ func NewHashMap[T any]() *HashMap[T]
 NewHashMap creates a new generic hash map
 
 <a name="HashMap[T].Clear"></a>
-### func \(\*HashMap\[T\]\) [Clear](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L788>)
+### func \(\*HashMap\[T\]\) [Clear](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L801>)
 
 ```go
 func (n *HashMap[T]) Clear()
@@ -676,7 +682,7 @@ func (n *HashMap[T]) Clear()
 Clear clears the map
 
 <a name="HashMap[T].Delete"></a>
-### func \(\*HashMap\[T\]\) [Delete](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L773>)
+### func \(\*HashMap\[T\]\) [Delete](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L786>)
 
 ```go
 func (n *HashMap[T]) Delete(key string)
@@ -685,7 +691,7 @@ func (n *HashMap[T]) Delete(key string)
 Delete deletes the key from the map
 
 <a name="HashMap[T].Exists"></a>
-### func \(\*HashMap\[T\]\) [Exists](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L780>)
+### func \(\*HashMap\[T\]\) [Exists](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L793>)
 
 ```go
 func (n *HashMap[T]) Exists(key string) bool
@@ -694,7 +700,7 @@ func (n *HashMap[T]) Exists(key string) bool
 Exists returns true if the key exists in the map
 
 <a name="HashMap[T].Get"></a>
-### func \(\*HashMap\[T\]\) [Get](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L748>)
+### func \(\*HashMap\[T\]\) [Get](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L759>)
 
 ```go
 func (n *HashMap[T]) Get(key string) (T, bool)
@@ -703,7 +709,7 @@ func (n *HashMap[T]) Get(key string) (T, bool)
 Get gets the value from the key
 
 <a name="HashMap[T].Keys"></a>
-### func \(\*HashMap\[T\]\) [Keys](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L795>)
+### func \(\*HashMap\[T\]\) [Keys](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L808>)
 
 ```go
 func (n *HashMap[T]) Keys() []string
@@ -712,7 +718,7 @@ func (n *HashMap[T]) Keys() []string
 Keys returns a copy of the keys in the map as a slice
 
 <a name="HashMap[T].Len"></a>
-### func \(\*HashMap\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L741>)
+### func \(\*HashMap\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L752>)
 
 ```go
 func (n *HashMap[T]) Len() int
@@ -721,7 +727,7 @@ func (n *HashMap[T]) Len() int
 Len returns the length of the map
 
 <a name="HashMap[T].Range"></a>
-### func \(\*HashMap\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L763>)
+### func \(\*HashMap\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L774>)
 
 ```go
 func (n *HashMap[T]) Range(f func(id string, node T) bool)
@@ -730,7 +736,7 @@ func (n *HashMap[T]) Range(f func(id string, node T) bool)
 Range ranges over the map with a function until false is returned
 
 <a name="HashMap[T].Set"></a>
-### func \(\*HashMap\[T\]\) [Set](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L756>)
+### func \(\*HashMap\[T\]\) [Set](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L767>)
 
 ```go
 func (n *HashMap[T]) Set(key string, value T)
@@ -739,7 +745,7 @@ func (n *HashMap[T]) Set(key string, value T)
 Set sets the key to the value
 
 <a name="HashMap[T].Values"></a>
-### func \(\*HashMap\[T\]\) [Values](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L808>)
+### func \(\*HashMap\[T\]\) [Values](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L821>)
 
 ```go
 func (n *HashMap[T]) Values() []T
@@ -748,7 +754,7 @@ func (n *HashMap[T]) Values() []T
 Values returns a copy of the values in the map as a slice
 
 <a name="MultiContext"></a>
-## type [MultiContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1300-L1305>)
+## type [MultiContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1313-L1318>)
 
 MultiContext is a context that can be used to combine contexts with a root context so they can be cancelled together.
 
@@ -760,7 +766,7 @@ type MultiContext struct {
 ```
 
 <a name="NewMultiContext"></a>
-### func [NewMultiContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1308>)
+### func [NewMultiContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1321>)
 
 ```go
 func NewMultiContext(ctx context.Context) *MultiContext
@@ -769,7 +775,7 @@ func NewMultiContext(ctx context.Context) *MultiContext
 NewMultiContext returns a new MultiContext.
 
 <a name="MultiContext.Cancel"></a>
-### func \(\*MultiContext\) [Cancel](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1338>)
+### func \(\*MultiContext\) [Cancel](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1351>)
 
 ```go
 func (m *MultiContext) Cancel()
@@ -778,7 +784,7 @@ func (m *MultiContext) Cancel()
 Cancel cancels all child contexts.
 
 <a name="MultiContext.WithContext"></a>
-### func \(\*MultiContext\) [WithContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1329>)
+### func \(\*MultiContext\) [WithContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1342>)
 
 ```go
 func (m *MultiContext) WithContext(ctx context.Context) context.Context
@@ -787,7 +793,7 @@ func (m *MultiContext) WithContext(ctx context.Context) context.Context
 WithContext returns a new context that is a child of the root context. This context will be cancelled when the multi context is cancelled.
 
 <a name="PriorityQueue"></a>
-## type [PriorityQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L827-L830>)
+## type [PriorityQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L840-L843>)
 
 PriorityQueue is a thread safe priority queue
 
@@ -798,7 +804,7 @@ type PriorityQueue[T any] struct {
 ```
 
 <a name="NewPriorityQueue"></a>
-### func [NewPriorityQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L833>)
+### func [NewPriorityQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L846>)
 
 ```go
 func NewPriorityQueue[T any]() *PriorityQueue[T]
@@ -807,7 +813,7 @@ func NewPriorityQueue[T any]() *PriorityQueue[T]
 NewPriorityQueue creates a new priority queue
 
 <a name="PriorityQueue[T].Len"></a>
-### func \(\*PriorityQueue\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L855>)
+### func \(\*PriorityQueue\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L868>)
 
 ```go
 func (q *PriorityQueue[T]) Len() int
@@ -816,7 +822,7 @@ func (q *PriorityQueue[T]) Len() int
 Len returns the length of the queue
 
 <a name="PriorityQueue[T].Peek"></a>
-### func \(\*PriorityQueue\[T\]\) [Peek](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L884>)
+### func \(\*PriorityQueue\[T\]\) [Peek](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L897>)
 
 ```go
 func (q *PriorityQueue[T]) Peek() (T, bool)
@@ -825,7 +831,7 @@ func (q *PriorityQueue[T]) Peek() (T, bool)
 Peek returns the next item in the queue without removing it
 
 <a name="PriorityQueue[T].Pop"></a>
-### func \(\*PriorityQueue\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L872>)
+### func \(\*PriorityQueue\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L885>)
 
 ```go
 func (q *PriorityQueue[T]) Pop() (T, bool)
@@ -834,7 +840,7 @@ func (q *PriorityQueue[T]) Pop() (T, bool)
 Pop pops an item off the queue
 
 <a name="PriorityQueue[T].Push"></a>
-### func \(\*PriorityQueue\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L862>)
+### func \(\*PriorityQueue\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L875>)
 
 ```go
 func (q *PriorityQueue[T]) Push(item T, weight float64)
@@ -843,7 +849,7 @@ func (q *PriorityQueue[T]) Push(item T, weight float64)
 Push pushes an item onto the queue
 
 <a name="PriorityQueue[T].UpdatePriority"></a>
-### func \(\*PriorityQueue\[T\]\) [UpdatePriority](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L840>)
+### func \(\*PriorityQueue\[T\]\) [UpdatePriority](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L853>)
 
 ```go
 func (q *PriorityQueue[T]) UpdatePriority(value T, priority float64)
@@ -852,7 +858,7 @@ func (q *PriorityQueue[T]) UpdatePriority(value T, priority float64)
 
 
 <a name="Queue"></a>
-## type [Queue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L969-L972>)
+## type [Queue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L982-L985>)
 
 Queue is a thread safe non\-blocking queue
 
@@ -863,7 +869,7 @@ type Queue[T any] struct {
 ```
 
 <a name="NewQueue"></a>
-### func [NewQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L975>)
+### func [NewQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L988>)
 
 ```go
 func NewQueue[T any]() *Queue[T]
@@ -872,7 +878,7 @@ func NewQueue[T any]() *Queue[T]
 NewQueue returns a new Queue
 
 <a name="Queue[T].Len"></a>
-### func \(\*Queue\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1002>)
+### func \(\*Queue\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1015>)
 
 ```go
 func (s *Queue[T]) Len() int
@@ -881,7 +887,7 @@ func (s *Queue[T]) Len() int
 Len returns the length of the queue
 
 <a name="Queue[T].Peek"></a>
-### func \(\*Queue\[T\]\) [Peek](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1009>)
+### func \(\*Queue\[T\]\) [Peek](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1022>)
 
 ```go
 func (s *Queue[T]) Peek() (T, bool)
@@ -890,7 +896,7 @@ func (s *Queue[T]) Peek() (T, bool)
 Peek returns the next item in the queue without removing it
 
 <a name="Queue[T].Pop"></a>
-### func \(\*Queue\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L988>)
+### func \(\*Queue\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1001>)
 
 ```go
 func (s *Queue[T]) Pop() (T, bool)
@@ -899,7 +905,7 @@ func (s *Queue[T]) Pop() (T, bool)
 Pop and return top element of Queue. Return false if Queue is empty.
 
 <a name="Queue[T].Push"></a>
-### func \(\*Queue\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L981>)
+### func \(\*Queue\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L994>)
 
 ```go
 func (s *Queue[T]) Push(f T)
@@ -908,7 +914,7 @@ func (s *Queue[T]) Push(f T)
 Push a new value onto the Queue
 
 <a name="Queue[T].Range"></a>
-### func \(\*Queue\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1019>)
+### func \(\*Queue\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1032>)
 
 ```go
 func (q *Queue[T]) Range(fn func(element T) bool)
@@ -917,7 +923,7 @@ func (q *Queue[T]) Range(fn func(element T) bool)
 Range executes a provided function once for each Queue element until it returns false or the Queue is empty.
 
 <a name="Queue[T].RangeUntil"></a>
-### func \(\*Queue\[T\]\) [RangeUntil](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1033>)
+### func \(\*Queue\[T\]\) [RangeUntil](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1046>)
 
 ```go
 func (q *Queue[T]) RangeUntil(fn func(element T) bool, done chan struct{})
@@ -926,7 +932,7 @@ func (q *Queue[T]) RangeUntil(fn func(element T) bool, done chan struct{})
 RangeUntil executes a provided function once for each Queue element until it returns false or a value is sent on the done channel. Use this function when you want to continuously process items from the queue until a done signal is received.
 
 <a name="Set"></a>
-## type [Set](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1159-L1162>)
+## type [Set](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1172-L1175>)
 
 Set is a basic thread\-safe Set implementation.
 
@@ -937,7 +943,7 @@ type Set[T comparable] struct {
 ```
 
 <a name="NewSet"></a>
-### func [NewSet](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1165>)
+### func [NewSet](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1178>)
 
 ```go
 func NewSet[T comparable]() *Set[T]
@@ -946,7 +952,7 @@ func NewSet[T comparable]() *Set[T]
 NewSet returns a new Set with the given initial size.
 
 <a name="Set[T].Add"></a>
-### func \(\*Set\[T\]\) [Add](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1171>)
+### func \(\*Set\[T\]\) [Add](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1184>)
 
 ```go
 func (s *Set[T]) Add(val T)
@@ -955,7 +961,7 @@ func (s *Set[T]) Add(val T)
 Add adds an element to the Set.
 
 <a name="Set[T].Contains"></a>
-### func \(\*Set\[T\]\) [Contains](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1185>)
+### func \(\*Set\[T\]\) [Contains](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1198>)
 
 ```go
 func (s *Set[T]) Contains(val T) bool
@@ -964,7 +970,7 @@ func (s *Set[T]) Contains(val T) bool
 Contains returns true if the Set contains the element.
 
 <a name="Set[T].Len"></a>
-### func \(\*Set\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1204>)
+### func \(\*Set\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1217>)
 
 ```go
 func (s *Set[T]) Len() int
@@ -973,7 +979,7 @@ func (s *Set[T]) Len() int
 Len returns the number of elements in the Set.
 
 <a name="Set[T].Range"></a>
-### func \(\*Set\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1193>)
+### func \(\*Set\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1206>)
 
 ```go
 func (s *Set[T]) Range(fn func(element T) bool)
@@ -982,7 +988,7 @@ func (s *Set[T]) Range(fn func(element T) bool)
 Range executes a provided function once for each Set element until it returns false.
 
 <a name="Set[T].Remove"></a>
-### func \(\*Set\[T\]\) [Remove](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1178>)
+### func \(\*Set\[T\]\) [Remove](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1191>)
 
 ```go
 func (s *Set[T]) Remove(val T)
@@ -991,7 +997,7 @@ func (s *Set[T]) Remove(val T)
 Remove removes an element from the Set.
 
 <a name="Set[T].Sort"></a>
-### func \(\*Set\[T\]\) [Sort](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1222>)
+### func \(\*Set\[T\]\) [Sort](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1235>)
 
 ```go
 func (s *Set[T]) Sort(lessFunc func(i T, j T) bool) []T
@@ -1000,7 +1006,7 @@ func (s *Set[T]) Sort(lessFunc func(i T, j T) bool) []T
 Sort returns the values of the set as an array sorted by the provided less function
 
 <a name="Set[T].Values"></a>
-### func \(\*Set\[T\]\) [Values](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1211>)
+### func \(\*Set\[T\]\) [Values](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1224>)
 
 ```go
 func (s *Set[T]) Values() []T
@@ -1009,7 +1015,7 @@ func (s *Set[T]) Values() []T
 Values returns the values of the set as an array
 
 <a name="Stack"></a>
-## type [Stack](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1057-L1060>)
+## type [Stack](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1070-L1073>)
 
 Stack is a basic LIFO Stack
 
@@ -1020,7 +1026,7 @@ type Stack[T any] struct {
 ```
 
 <a name="NewStack"></a>
-### func [NewStack](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1051>)
+### func [NewStack](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1064>)
 
 ```go
 func NewStack[T any]() *Stack[T]
@@ -1029,7 +1035,7 @@ func NewStack[T any]() *Stack[T]
 NewStack returns a new Stack instance
 
 <a name="Stack[T].Clear"></a>
-### func \(\*Stack\[T\]\) [Clear](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1103>)
+### func \(\*Stack\[T\]\) [Clear](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1116>)
 
 ```go
 func (s *Stack[T]) Clear()
@@ -1038,7 +1044,7 @@ func (s *Stack[T]) Clear()
 Clear removes all elements from the Stack
 
 <a name="Stack[T].Len"></a>
-### func \(\*Stack\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1139>)
+### func \(\*Stack\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1152>)
 
 ```go
 func (s *Stack[T]) Len() int
@@ -1047,7 +1053,7 @@ func (s *Stack[T]) Len() int
 Len returns the number of elements in the Stack.
 
 <a name="Stack[T].Peek"></a>
-### func \(\*Stack\[T\]\) [Peek](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1146>)
+### func \(\*Stack\[T\]\) [Peek](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1159>)
 
 ```go
 func (s *Stack[T]) Peek() (T, bool)
@@ -1056,7 +1062,7 @@ func (s *Stack[T]) Peek() (T, bool)
 Peek returns the top element of the Stack without removing it. Return false if Stack is empty.
 
 <a name="Stack[T].Pop"></a>
-### func \(\*Stack\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1089>)
+### func \(\*Stack\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1102>)
 
 ```go
 func (s *Stack[T]) Pop() (T, bool)
@@ -1065,7 +1071,7 @@ func (s *Stack[T]) Pop() (T, bool)
 Pop removes and return top element of Stack. Return false if Stack is empty.
 
 <a name="Stack[T].Push"></a>
-### func \(\*Stack\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1082>)
+### func \(\*Stack\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1095>)
 
 ```go
 func (s *Stack[T]) Push(f T)
@@ -1074,7 +1080,7 @@ func (s *Stack[T]) Push(f T)
 Push a new value onto the Stack \(LIFO\)
 
 <a name="Stack[T].Range"></a>
-### func \(\*Stack\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1110>)
+### func \(\*Stack\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1123>)
 
 ```go
 func (s *Stack[T]) Range(fn func(element T) bool)
@@ -1083,7 +1089,7 @@ func (s *Stack[T]) Range(fn func(element T) bool)
 Range executes a provided function once for each Stack element until it returns false.
 
 <a name="Stack[T].RangeUntil"></a>
-### func \(\*Stack\[T\]\) [RangeUntil](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1064>)
+### func \(\*Stack\[T\]\) [RangeUntil](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1077>)
 
 ```go
 func (s *Stack[T]) RangeUntil(fn func(element T) bool, done chan struct{})
@@ -1092,7 +1098,7 @@ func (s *Stack[T]) RangeUntil(fn func(element T) bool, done chan struct{})
 RangeUntil executes a provided function once after calling Pop on the stack until the function returns false or a value is sent on the done channel. Use this function when you want to continuously process items from the stack until a done signal is received.
 
 <a name="Stack[T].Sort"></a>
-### func \(\*Stack\[T\]\) [Sort](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1130>)
+### func \(\*Stack\[T\]\) [Sort](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1143>)
 
 ```go
 func (s *Stack[T]) Sort(lessFunc func(i T, j T) bool) []T
@@ -1101,7 +1107,7 @@ func (s *Stack[T]) Sort(lessFunc func(i T, j T) bool) []T
 Sort returns the values of the stack as an array sorted by the provided less function
 
 <a name="Stack[T].Values"></a>
-### func \(\*Stack\[T\]\) [Values](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1123>)
+### func \(\*Stack\[T\]\) [Values](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1136>)
 
 ```go
 func (s *Stack[T]) Values() []T
