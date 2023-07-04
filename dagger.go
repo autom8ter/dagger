@@ -333,56 +333,12 @@ type GraphSearchFunc[N Node] func(ctx context.Context, relationship string, node
 // The reverse parameter determines whether the search is reversed or not.
 // The fn parameter is a function that is called on each node in the graph. If the function returns false, the search is stopped.
 func (g *DirectedGraph[N]) BFS(ctx context.Context, reverse bool, start *GraphNode[N], search GraphSearchFunc[N]) error {
-	var visited = map[string]struct{}{}
-	q := NewBlockingQueue[*searchItem[N]](0)
-	ctx, cancel := context.WithCancel(ctx)
-	mu := &sync.RWMutex{}
-	var errChan = make(chan error, 1)
-	defer cancel()
-	go func() {
-		egp, ctx := errgroup.WithContext(ctx)
-		if err := g.bfs(ctx, &bfsState[N]{
-			visited:      visited,
-			egp:          egp,
-			mu:           mu,
-			q:            q,
-			reverse:      reverse,
-			root:         start,
-			next:         start,
-			relationship: "",
-		}); err != nil {
-			errChan <- err
-		}
-		if err := egp.Wait(); err != nil {
-			errChan <- err
-		}
-		cancel()
-	}()
-	q.RangeContext(ctx, func(element *searchItem[N]) bool {
-		if element.node.Value.ID() != start.Value.ID() {
-			return search(ctx, element.relationship, element.node)
-		}
-		return true
-	})
-	select {
-	case err := <-errChan:
-		return err
-	default:
-		return nil
-	}
-}
-
-// DFS executes a depth first search on the graph starting from the current node.
-// The reverse parameter determines whether the search is reversed or not.
-// The fn parameter is a function that is called on each node in the graph. If the function returns false, the search is stopped.
-func (g *DirectedGraph[N]) DFS(ctx context.Context, reverse bool, start *GraphNode[N], fn GraphSearchFunc[N]) error {
-	var visited = map[string]struct{}{}
+	var visited = NewSet[string]()
 	stack := NewStack[*searchItem[N]]()
-	egp, ctx := errgroup.WithContext(ctx)
-	if err := g.dfs(ctx, &dfsState[N]{
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	if err := g.breadthFirstSearch(ctx, &breadthFirstSearchState[N]{
 		visited:      visited,
-		egp:          egp,
-		mu:           &sync.RWMutex{},
 		stack:        stack,
 		reverse:      reverse,
 		root:         start,
@@ -393,10 +349,53 @@ func (g *DirectedGraph[N]) DFS(ctx context.Context, reverse bool, start *GraphNo
 	}
 	stack.Range(func(element *searchItem[N]) bool {
 		if element.node.Value.ID() != start.Value.ID() {
-			return fn(ctx, element.relationship, element.node)
+			return search(ctx, element.relationship, element.node)
 		}
+		debugF("element: %s\n", element.node.Value.ID())
 		return true
 	})
+	return nil
+}
+
+// DFS executes a depth first search on the graph starting from the current node.
+// The reverse parameter determines whether the search is reversed or not.
+// The fn parameter is a function that is called on each node in the graph. If the function returns false, the search is stopped.
+func (g *DirectedGraph[N]) DFS(ctx context.Context, reverse bool, start *GraphNode[N], fn GraphSearchFunc[N]) error {
+	var visited = NewSet[string]()
+	queue := NewQueue[*searchItem[N]]()
+	var done = make(chan struct{}, 1)
+	egp1, ctx := errgroup.WithContext(ctx)
+	egp1.Go(func() error {
+		egp2, ctx := errgroup.WithContext(ctx)
+		if err := g.depthFirstSearch(ctx, &depthFirstSearchState[N]{
+			visited:      visited,
+			egp:          egp2,
+			queue:        queue,
+			reverse:      reverse,
+			root:         start,
+			next:         start,
+			relationship: "",
+		}); err != nil {
+			return err
+		}
+		if err := egp2.Wait(); err != nil {
+			return err
+		}
+		done <- struct{}{}
+		return nil
+	})
+	egp1.Go(func() error {
+		queue.RangeUntil(func(element *searchItem[N]) bool {
+			if element.node.Value.ID() != start.Value.ID() {
+				return fn(ctx, element.relationship, element.node)
+			}
+			return true
+		}, done)
+		return nil
+	})
+	if err := egp1.Wait(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -406,10 +405,8 @@ type searchItem[N Node] struct {
 	relationship string
 }
 
-type dfsState[N Node] struct {
-	visited      map[string]struct{}
-	egp          *errgroup.Group
-	mu           *sync.RWMutex
+type breadthFirstSearchState[N Node] struct {
+	visited      *Set[string]
 	stack        *Stack[*searchItem[N]]
 	reverse      bool
 	root         *GraphNode[N]
@@ -417,40 +414,22 @@ type dfsState[N Node] struct {
 	relationship string
 }
 
-func (g *DirectedGraph[N]) dfs(ctx context.Context, state *dfsState[N]) error {
+func (g *DirectedGraph[N]) breadthFirstSearch(ctx context.Context, state *breadthFirstSearchState[N]) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if state.next == nil {
 		state.next = state.root
 	}
-	if _, ok := state.visited[state.next.Value.ID()]; !ok {
-		state.visited[state.next.Value.ID()] = struct{}{}
+	if !state.visited.Contains(state.next.Value.ID()) {
+		state.visited.Add(state.next.Value.ID())
 		state.stack.Push(&searchItem[N]{
 			node:         state.next,
 			relationship: state.relationship,
 		})
 		if state.reverse {
-			state.next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
-				g.dfs(ctx, &dfsState[N]{
-					egp:          state.egp,
-					mu:           state.mu,
-					stack:        state.stack,
-					reverse:      state.reverse,
-					root:         state.root,
-					next:         edge.To,
-					relationship: edge.Relationship,
-					visited:      state.visited,
-				})
-				state.mu.RLock()
-				defer state.mu.RUnlock()
-				return len(state.visited) < g.nodes.Len() && ctx.Err() == nil
-			})
-		} else {
 			state.next.edgesTo.Range(func(key string, edge *GraphEdge[N]) bool {
-				g.dfs(ctx, &dfsState[N]{
-					egp:          state.egp,
-					mu:           state.mu,
+				g.breadthFirstSearch(ctx, &breadthFirstSearchState[N]{
 					stack:        state.stack,
 					reverse:      state.reverse,
 					root:         state.root,
@@ -458,79 +437,77 @@ func (g *DirectedGraph[N]) dfs(ctx context.Context, state *dfsState[N]) error {
 					relationship: edge.Relationship,
 					visited:      state.visited,
 				})
-				state.mu.RLock()
-				defer state.mu.RUnlock()
-				return len(state.visited) < g.nodes.Len() && ctx.Err() == nil
+				return state.visited.Len() < g.nodes.Len() && ctx.Err() == nil
+			})
+		} else {
+			state.next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
+				g.breadthFirstSearch(ctx, &breadthFirstSearchState[N]{
+					visited:      state.visited,
+					stack:        state.stack,
+					reverse:      state.reverse,
+					root:         state.root,
+					next:         edge.To,
+					relationship: edge.Relationship,
+				})
+				return state.visited.Len() < g.nodes.Len() && ctx.Err() == nil
 			})
 		}
 	}
 	return ctx.Err()
 }
 
-type bfsState[N Node] struct {
-	visited      map[string]struct{}
+type depthFirstSearchState[N Node] struct {
+	visited      *Set[string]
 	egp          *errgroup.Group
-	mu           *sync.RWMutex
-	q            *BlockingQueue[*searchItem[N]]
+	queue        *Queue[*searchItem[N]]
 	reverse      bool
 	root         *GraphNode[N]
 	next         *GraphNode[N]
 	relationship string
 }
 
-func (g *DirectedGraph[N]) bfs(ctx context.Context, state *bfsState[N]) error {
+func (g *DirectedGraph[N]) depthFirstSearch(ctx context.Context, state *depthFirstSearchState[N]) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if state.next == nil {
 		state.next = state.root
 	}
-	state.mu.Lock()
-	_, ok := state.visited[state.next.Value.ID()]
-	if !ok {
-		state.visited[state.next.Value.ID()] = struct{}{}
-	}
-	state.mu.Unlock()
-	if !ok {
-		state.q.Push(&searchItem[N]{
+	if !state.visited.Contains(state.next.Value.ID()) {
+		state.visited.Add(state.next.Value.ID())
+		state.queue.Push(&searchItem[N]{
 			node:         state.next,
 			relationship: state.relationship,
 		})
 		if state.reverse {
 			state.egp.Go(func() error {
 				state.next.edgesTo.Range(func(key string, edge *GraphEdge[N]) bool {
-					g.bfs(ctx, &bfsState[N]{
+					g.depthFirstSearch(ctx, &depthFirstSearchState[N]{
 						visited:      state.visited,
 						egp:          state.egp,
-						mu:           state.mu,
-						q:            state.q,
+						queue:        state.queue,
 						reverse:      state.reverse,
 						root:         state.root,
 						next:         edge.From,
 						relationship: edge.Relationship,
 					})
-					state.mu.RLock()
-					defer state.mu.RUnlock()
-					return len(state.visited) < g.nodes.Len() && ctx.Err() == nil
+					return state.visited.Len() < g.nodes.Len() && ctx.Err() == nil
 				})
 				return nil
 			})
 		} else {
 			state.egp.Go(func() error {
 				state.next.edgesFrom.Range(func(key string, edge *GraphEdge[N]) bool {
-					g.bfs(ctx, &bfsState[N]{
+					g.depthFirstSearch(ctx, &depthFirstSearchState[N]{
 						visited:      state.visited,
 						egp:          state.egp,
-						mu:           state.mu,
-						q:            state.q,
+						queue:        state.queue,
 						reverse:      state.reverse,
 						root:         state.root,
 						next:         edge.To,
 						relationship: edge.Relationship,
 					})
-					state.mu.RLock()
-					defer state.mu.RUnlock()
-					return len(state.visited) < g.nodes.Len() && ctx.Err() == nil
+					return state.visited.Len() < g.nodes.Len() && ctx.Err() == nil
 				})
 				return nil
 			})
@@ -988,13 +965,11 @@ func (q *BlockingQueue[T]) Range(fn func(element T) bool) {
 	}
 }
 
-// RangeContext executes a provided function once for each BlockingQueue element until it returns false or the context is done.
-func (q *BlockingQueue[T]) RangeContext(ctx context.Context, fn func(element T) bool) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+// RangeUntil executes a provided function once for each BlockingQueue element until it returns false or a value is sent to the done channel.
+func (q *BlockingQueue[T]) RangeUntil(fn func(element T) bool, done chan struct{}) {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			return
 		case r, ok := <-q.ch:
 			if !ok {
@@ -1082,7 +1057,7 @@ func (s *Queue[T]) Peek() (T, bool) {
 	return s.values[len(s.values)-1], true
 }
 
-// Range executes a provided function once for each Queue element until it returns false.
+// Range executes a provided function once for each Queue element until it returns false or the Queue is empty.
 func (q *Queue[T]) Range(fn func(element T) bool) {
 	for {
 		val, ok := q.Pop()
@@ -1091,6 +1066,24 @@ func (q *Queue[T]) Range(fn func(element T) bool) {
 		}
 		if !fn(val) {
 			return
+		}
+	}
+}
+
+// RangeUntil executes a provided function once for each Queue element until it returns false or a value is sent on the done channel.
+func (q *Queue[T]) RangeUntil(fn func(element T) bool, done chan struct{}) {
+	for {
+		select {
+		case <-done:
+			return
+		default:
+			val, ok := q.Pop()
+			if !ok {
+				return
+			}
+			if !fn(val) {
+				return
+			}
 		}
 	}
 }

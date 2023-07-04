@@ -109,7 +109,7 @@ func TestGraph(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, img)
 	})
-	t.Run("bfs", func(t *testing.T) {
+	t.Run("breadthFirstSearch", func(t *testing.T) {
 		graph := dagger.NewGraph[dagger.String]()
 		lastNode := graph.SetNode(dagger.UniqueID("node"))
 		for i := 0; i < 100; i++ {
@@ -130,7 +130,7 @@ func TestGraph(t *testing.T) {
 
 		assert.Equal(t, 100, len(nodes))
 	})
-	t.Run("dfs", func(t *testing.T) {
+	t.Run("depthFirstSearch", func(t *testing.T) {
 		graph := dagger.NewGraph[dagger.String]()
 		lastNode := graph.SetNode(dagger.UniqueID("node"))
 		for i := 0; i < 100; i++ {
