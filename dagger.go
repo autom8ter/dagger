@@ -21,6 +21,8 @@ Set: thread safe set
 ChannelGroup: thread safe group of channels for broadcasting 1 value to N channels
 
 MultiContext: thread safe context for coordinating the cancellation of multiple contexts
+
+Borrower: thread safe object ownership manager
 */
 package dagger
 
@@ -37,6 +39,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/goccy/go-graphviz"
 	"github.com/goccy/go-graphviz/cgraph"
@@ -57,7 +60,7 @@ func UniqueID(prefix string) string {
 }
 
 // GraphEdge is a relationship between two nodes
-type GraphEdge[T any] struct {
+type GraphEdge[T Node] struct {
 	// ID is the unique identifier of the edge
 	id string
 	// Metadata is the metadata of the edge
@@ -103,42 +106,23 @@ func (n *GraphEdge[T]) SetMetadata(metadata map[string]string) {
 	}
 }
 
+// Node is a node in the graph. It can be connected to other nodes via edges.
+type Node interface {
+	// ID returns the unique identifier of the node
+	ID() string
+	// Metadata returns the metadata of the node
+	Metadata() map[string]string
+	// SetMetadata sets the metadata of the node
+	SetMetadata(metadata map[string]string)
+}
+
 // GraphNode is a node in the graph. It can be connected to other nodes via edges.
-type GraphNode[T any] struct {
-	id        string
-	metadata  map[string]string
-	value     T
-	edgesFrom *HashMap[*GraphEdge[T]]
-	edgesTo   *HashMap[*GraphEdge[T]]
+type GraphNode[T Node] struct {
+	Node
+	edgesFrom *HashMap[string, *GraphEdge[T]]
+	edgesTo   *HashMap[string, *GraphEdge[T]]
 	graph     *DAG[T]
 	node      *cgraph.Node
-}
-
-// ID returns the unique identifier of the node
-func (n *GraphNode[T]) ID() string {
-	return n.id
-}
-
-// Metadata returns the metadata of the node
-func (n *GraphNode[T]) Metadata() map[string]string {
-	return n.metadata
-}
-
-// Value returns the value of the node
-func (n *GraphNode[T]) Value() T {
-	return n.value
-}
-
-// SetMetadata sets the metadata of the node
-func (n *GraphNode[T]) SetMetadata(metadata map[string]string) {
-	for k, v := range metadata {
-		n.metadata[k] = v
-	}
-}
-
-// SetValue sets the value of the node
-func (n *GraphNode[T]) SetValue(value T) {
-	n.value = value
 }
 
 // DFS performs a depth-first search on the graph starting from the current node
@@ -181,23 +165,27 @@ func (n *GraphNode[T]) EdgesTo(relationship string, fn func(e *GraphEdge[T]) boo
 // If the nodeID does not exist, an error is returned.
 // If the edgeID is empty, a unique id will be generated.
 // If the metadata is nil, an empty map will be used.
-func (n *GraphNode[T]) SetEdge(toNode *GraphNode[T], relationship string, metadata map[string]string) (*GraphEdge[T], error) {
+func (n *GraphNode[T]) SetEdge(relationship string, toNode Node, metadata map[string]string) (*GraphEdge[T], error) {
 	if metadata == nil {
 		metadata = make(map[string]string)
+	}
+	to, ok := n.graph.nodes.Get(toNode.ID())
+	if !ok {
+		to = n.graph.SetNode(toNode)
 	}
 	n.graph.mu.Lock()
 	defer n.graph.mu.Unlock()
 	e := &GraphEdge[T]{
-		id:       strings.ReplaceAll(strings.ToLower(fmt.Sprintf("%s-(%s)-%s", n.id, relationship, toNode.id)), " ", "-"),
+		id:       strings.ReplaceAll(strings.ToLower(fmt.Sprintf("%v-(%v)-%v", n.ID(), relationship, toNode.ID())), " ", "-"),
 		metadata: metadata,
 		from:     n,
-		to:       toNode,
+		to:       to,
 	}
 	n.graph.edges.Set(e.ID(), e)
-	toNode.edgesTo.Set(e.ID(), e)
+	to.edgesTo.Set(e.ID(), e)
 	n.edgesFrom.Set(e.ID(), e)
 	if n.graph.options.vizualize {
-		ge, err := n.graph.viz.CreateEdge(e.ID(), n.node, toNode.node)
+		ge, err := n.graph.viz.CreateEdge(e.ID(), n.node, to.node)
 		if err != nil {
 			return nil, err
 		}
@@ -254,7 +242,7 @@ func (n *GraphNode[T]) Remove() error {
 		n.removeEdge(edge.ID())
 		return true
 	})
-	n.graph.nodes.Delete(n.id)
+	n.graph.nodes.Delete(n.ID())
 	if n.graph.options.vizualize {
 		n.graph.viz.DeleteNode(n.node)
 	}
@@ -270,16 +258,16 @@ func (n *GraphNode[T]) Graph() *DAG[T] {
 func (n *GraphNode[T]) Ancestors(fn func(node *GraphNode[T]) bool) {
 	n.graph.mu.RLock()
 	defer n.graph.mu.RUnlock()
-	visited := make(map[string]bool)
+	visited := NewSet[string]()
 	n.ancestors(visited, fn)
 }
 
-func (n *GraphNode[T]) ancestors(visited map[string]bool, fn func(node *GraphNode[T]) bool) {
+func (n *GraphNode[T]) ancestors(visited *Set[string], fn func(node *GraphNode[T]) bool) {
 	n.edgesTo.Range(func(key string, edge *GraphEdge[T]) bool {
-		if visited[edge.From().id] {
+		if visited.Contains(edge.From().ID()) {
 			return true
 		}
-		visited[edge.From().id] = true
+		visited.Add(edge.From().ID())
 		if !fn(edge.From()) {
 			return false
 		}
@@ -292,27 +280,22 @@ func (n *GraphNode[T]) ancestors(visited map[string]bool, fn func(node *GraphNod
 func (n *GraphNode[T]) Descendants(fn func(node *GraphNode[T]) bool) {
 	n.graph.mu.RLock()
 	defer n.graph.mu.RUnlock()
-	visited := make(map[string]bool)
+	visited := NewSet[string]()
 	n.descendants(visited, fn)
 }
 
-func (n *GraphNode[T]) descendants(visited map[string]bool, fn func(node *GraphNode[T]) bool) {
+func (n *GraphNode[T]) descendants(visited *Set[string], fn func(node *GraphNode[T]) bool) {
 	n.edgesFrom.Range(func(key string, edge *GraphEdge[T]) bool {
-		if visited[edge.To().id] {
+		if visited.Contains(edge.To().ID()) {
 			return true
 		}
-		visited[edge.To().id] = true
+		visited.Add(edge.To().ID())
 		if !fn(edge.To()) {
 			return false
 		}
 		edge.To().descendants(visited, fn)
 		return true
 	})
-}
-
-// String returns a string representation of the node
-func (n *GraphNode[T]) String() string {
-	return fmt.Sprintf("GraphNode[%T]:%s", n.value, n.id)
 }
 
 // IsConnectedTo returns true if the current node is connected to the given node in any direction
@@ -336,9 +319,9 @@ func (n *GraphNode[T]) IsConnectedTo(node *GraphNode[T]) bool {
 }
 
 // DAG is a concurrency safe, mutable, in-memory directed graph
-type DAG[T any] struct {
-	nodes   *HashMap[*GraphNode[T]]
-	edges   *HashMap[*GraphEdge[T]]
+type DAG[T Node] struct {
+	nodes   *HashMap[string, *GraphNode[T]]
+	edges   *HashMap[string, *GraphEdge[T]]
 	gviz    *graphviz.Graphviz
 	viz     *cgraph.Graph
 	mu      sync.RWMutex
@@ -360,15 +343,15 @@ func WithVizualization() DagOpt {
 }
 
 // NewDAG creates a new Directed Acyclic Graph instance
-func NewDAG[T any](opts ...DagOpt) (*DAG[T], error) {
+func NewDAG[T Node](opts ...DagOpt) (*DAG[T], error) {
 	var err error
 	options := &dagOpts{}
 	for _, opt := range opts {
 		opt(options)
 	}
 	g := &DAG[T]{
-		nodes:   NewHashMap[*GraphNode[T]](),
-		edges:   NewHashMap[*GraphEdge[T]](),
+		nodes:   NewHashMap[string, *GraphNode[T]](),
+		edges:   NewHashMap[string, *GraphEdge[T]](),
 		gviz:    graphviz.New(),
 		options: options,
 	}
@@ -380,29 +363,24 @@ func NewDAG[T any](opts ...DagOpt) (*DAG[T], error) {
 }
 
 // SetNode sets a node in the graph - it will use the node's ID as the key and overwrite any existing node with the same ID
-func (g *DAG[T]) SetNode(id string, node T, metadata map[string]string) *GraphNode[T] {
-	if metadata == nil {
-		metadata = make(map[string]string)
-	}
+func (g *DAG[T]) SetNode(node Node) *GraphNode[T] {
 	n := &GraphNode[T]{
-		id:        id,
-		value:     node,
-		metadata:  metadata,
-		edgesTo:   NewHashMap[*GraphEdge[T]](),
-		edgesFrom: NewHashMap[*GraphEdge[T]](),
+		Node:      node,
+		edgesTo:   NewHashMap[string, *GraphEdge[T]](),
+		edgesFrom: NewHashMap[string, *GraphEdge[T]](),
 		graph:     g,
 	}
-	g.nodes.Set(id, n)
+	g.nodes.Set(node.ID(), n)
 	if g.options.vizualize {
-		gn, err := g.viz.CreateNode(id)
+		gn, err := g.viz.CreateNode(fmt.Sprintf("%v", node.ID()))
 		if err != nil {
 			panic(err)
 		}
-		gn.SetLabel(id)
-		if label, ok := metadata["label"]; ok {
+		gn.SetLabel(fmt.Sprintf("%v", node.ID()))
+		if label, ok := node.Metadata()["label"]; ok {
 			gn.SetLabel(label)
 		}
-		if color, ok := metadata["color"]; ok {
+		if color, ok := node.Metadata()["color"]; ok {
 			gn.SetColor(color)
 		}
 
@@ -476,7 +454,7 @@ func (g *DAG[T]) RangeNodes(fn func(n *GraphNode[T]) bool) {
 }
 
 // GraphSearchFunc is a function that is called on each node in the graph during a search
-type GraphSearchFunc[T any] func(ctx context.Context, relationship string, node *GraphNode[T]) bool
+type GraphSearchFunc[T Node] func(ctx context.Context, relationship string, node *GraphNode[T]) bool
 
 // BFS executes a depth first search on the graph starting from the current node.
 // The reverse parameter determines whether the search is reversed or not.
@@ -497,7 +475,7 @@ func (g *DAG[T]) BFS(ctx context.Context, reverse bool, start *GraphNode[T], sea
 		return err
 	}
 	stack.Range(func(element *searchItem[T]) bool {
-		if element.node.id != start.id {
+		if element.node.ID() != start.ID() {
 			return search(ctx, element.relationship, element.node)
 		}
 		return true
@@ -534,7 +512,7 @@ func (g *DAG[T]) DFS(ctx context.Context, reverse bool, start *GraphNode[T], fn 
 	})
 	egp1.Go(func() error {
 		queue.RangeUntil(func(element *searchItem[T]) bool {
-			if element.node.id != start.id {
+			if element.node.ID() != start.ID() {
 				return fn(ctx, element.relationship, element.node)
 			}
 			return true
@@ -548,12 +526,12 @@ func (g *DAG[T]) DFS(ctx context.Context, reverse bool, start *GraphNode[T], fn 
 }
 
 // searchItem is an item that is used in the search queue/stack in DFS/BFS
-type searchItem[T any] struct {
+type searchItem[T Node] struct {
 	node         *GraphNode[T]
 	relationship string
 }
 
-type breadthFirstSearchState[T any] struct {
+type breadthFirstSearchState[T Node] struct {
 	visited      *Set[string]
 	stack        *Stack[*searchItem[T]]
 	reverse      bool
@@ -569,8 +547,8 @@ func (g *DAG[T]) breadthFirstSearch(ctx context.Context, state *breadthFirstSear
 	if state.next == nil {
 		state.next = state.root
 	}
-	if !state.visited.Contains(state.next.id) {
-		state.visited.Add(state.next.id)
+	if !state.visited.Contains(state.next.ID()) {
+		state.visited.Add(state.next.ID())
 		state.stack.Push(&searchItem[T]{
 			node:         state.next,
 			relationship: state.relationship,
@@ -604,7 +582,7 @@ func (g *DAG[T]) breadthFirstSearch(ctx context.Context, state *breadthFirstSear
 	return ctx.Err()
 }
 
-type depthFirstSearchState[T any] struct {
+type depthFirstSearchState[T Node] struct {
 	visited      *Set[string]
 	egp          *errgroup.Group
 	queue        *BoundedQueue[*searchItem[T]]
@@ -621,8 +599,8 @@ func (g *DAG[T]) depthFirstSearch(ctx context.Context, state *depthFirstSearchSt
 	if state.next == nil {
 		state.next = state.root
 	}
-	if !state.visited.Contains(state.next.id) {
-		state.visited.Add(state.next.id)
+	if !state.visited.Contains(state.next.ID()) {
+		state.visited.Add(state.next.ID())
 		state.queue.Push(&searchItem[T]{
 			node:         state.next,
 			relationship: state.relationship,
@@ -683,16 +661,16 @@ func (g *DAG[T]) Acyclic() bool {
 
 // isAcyclic returns true if the graph contains no cycles.
 func (g *DAG[T]) isCyclic(node *GraphNode[T], visited *Set[string], onStack *Set[string]) bool {
-	visited.Add(node.id)
-	onStack.Add(node.id)
+	visited.Add(node.ID())
+	onStack.Add(node.ID())
 	result := false
 	node.edgesFrom.Range(func(key string, edge *GraphEdge[T]) bool {
-		if visited.Contains(edge.To().id) {
+		if visited.Contains(edge.To().ID()) {
 			if g.isCyclic(edge.To(), visited, onStack) {
 				result = true
 				return false
 			}
-		} else if onStack.Contains(edge.To().id) {
+		} else if onStack.Contains(edge.To().ID()) {
 			result = true
 			return false
 		}
@@ -726,13 +704,13 @@ func (g *DAG[T]) TopologicalSort(reverse bool) ([]*GraphNode[T], error) {
 }
 
 func (g *DAG[T]) topology(reverse bool, stack *Stack[*GraphNode[T]], node *GraphNode[T], permanent, temporary *Set[string]) {
-	if permanent.Contains(node.id) {
+	if permanent.Contains(node.ID()) {
 		return
 	}
-	if temporary.Contains(node.id) {
+	if temporary.Contains(node.ID()) {
 		panic("not a DAG")
 	}
-	temporary.Add(node.id)
+	temporary.Add(node.ID())
 	if reverse {
 		node.edgesTo.Range(func(key string, edge *GraphEdge[T]) bool {
 			g.topology(reverse, stack, edge.From(), permanent, temporary)
@@ -744,8 +722,8 @@ func (g *DAG[T]) topology(reverse bool, stack *Stack[*GraphNode[T]], node *Graph
 			return true
 		})
 	}
-	temporary.Remove(node.id)
-	permanent.Add(node.id)
+	temporary.Remove(node.ID())
+	permanent.Add(node.ID())
 	stack.Push(node)
 }
 
@@ -764,19 +742,19 @@ func (g *DAG[T]) GraphViz() (image.Image, error) {
 }
 
 // NewHashMap creates a new generic hash map
-func NewHashMap[T any]() *HashMap[T] {
-	return &HashMap[T]{
+func NewHashMap[K comparable, V any]() *HashMap[K, V] {
+	return &HashMap[K, V]{
 		data: sync.Map{},
 	}
 }
 
 // HashMap is a thread safe map
-type HashMap[T any] struct {
+type HashMap[K comparable, V any] struct {
 	data sync.Map
 }
 
 // Len returns the length of the map
-func (n *HashMap[T]) Len() int {
+func (n *HashMap[K, V]) Len() int {
 	count := 0
 	n.data.Range(func(key, value interface{}) bool {
 		count++
@@ -786,32 +764,32 @@ func (n *HashMap[T]) Len() int {
 }
 
 // Get gets the value from the key
-func (n *HashMap[T]) Get(key string) (T, bool) {
+func (n *HashMap[K, V]) Get(key K) (V, bool) {
 	c, ok := n.data.Load(key)
 	if !ok {
-		return *new(T), ok
+		return *new(V), ok
 	}
-	return c.(T), ok
+	return c.(V), ok
 }
 
 // Set sets the key to the value
-func (n *HashMap[T]) Set(key string, value T) {
+func (n *HashMap[K, V]) Set(key K, value V) {
 	n.data.Store(key, value)
 }
 
 // Delete deletes the key from the map
-func (n *HashMap[T]) Delete(key string) {
+func (n *HashMap[K, V]) Delete(key K) {
 	n.data.Delete(key)
 }
 
 // Exists returns true if the key exists in the map
-func (n *HashMap[T]) Exists(key string) bool {
+func (n *HashMap[K, V]) Exists(key K) bool {
 	_, ok := n.Get(key)
 	return ok
 }
 
 // Clear clears the map
-func (n *HashMap[T]) Clear() {
+func (n *HashMap[K, V]) Clear() {
 	n.data.Range(func(key, value interface{}) bool {
 		n.data.Delete(key)
 		return true
@@ -819,38 +797,38 @@ func (n *HashMap[T]) Clear() {
 }
 
 // Keys returns a copy of the keys in the map as a slice
-func (n *HashMap[T]) Keys() []string {
-	var keys []string
+func (n *HashMap[K, V]) Keys() []K {
+	var keys []K
 	n.data.Range(func(key, value interface{}) bool {
-		keys = append(keys, key.(string))
+		keys = append(keys, key.(K))
 		return true
 	})
 	return keys
 }
 
 // Values returns a copy of the values in the map as a slice
-func (n *HashMap[T]) Values() []T {
-	var values []T
+func (n *HashMap[K, V]) Values() []V {
+	var values []V
 	n.data.Range(func(key, value interface{}) bool {
-		values = append(values, value.(T))
+		values = append(values, value.(V))
 		return true
 	})
 	return values
 }
 
 // Range ranges over the map with a function until false is returned
-func (n *HashMap[T]) Range(f func(id string, node T) bool) {
+func (n *HashMap[K, V]) Range(f func(key K, value V) bool) {
 	n.data.Range(func(key, value interface{}) bool {
-		return f(key.(string), value.(T))
+		return f(key.(K), value.(V))
 	})
 }
 
 // Filter returns a new hashmap with the values that return true from the function
-func (n *HashMap[T]) Filter(f func(id string, node T) bool) *HashMap[T] {
-	filtered := NewHashMap[T]()
+func (n *HashMap[K, V]) Filter(f func(key K, value V) bool) *HashMap[K, V] {
+	filtered := NewHashMap[K, V]()
 	n.data.Range(func(key, value interface{}) bool {
-		if f(key.(string), value.(T)) {
-			filtered.Set(key.(string), value.(T))
+		if f(key.(K), value.(V)) {
+			filtered.Set(key.(K), value.(V))
 		}
 		return true
 	})
@@ -858,10 +836,10 @@ func (n *HashMap[T]) Filter(f func(id string, node T) bool) *HashMap[T] {
 }
 
 // Map returns a copy of the hashmap as a map[string]T
-func (n *HashMap[T]) Map() map[string]T {
-	copied := map[string]T{}
+func (n *HashMap[K, V]) Map() map[K]V {
+	copied := map[K]V{}
 	n.data.Range(func(key, value interface{}) bool {
-		copied[key.(string)] = value.(T)
+		copied[key.(K)] = value.(V)
 		return true
 	})
 	return copied
@@ -1280,7 +1258,7 @@ func (s *Set[T]) Sort(lessFunc func(i T, j T) bool) []T {
 // ChannelGroup is a thread-safe group of channels. It is useful for broadcasting a value to multiple channels at once.
 type ChannelGroup[T any] struct {
 	ctx         *MultiContext
-	subscribers *HashMap[*channelGroupState[T]]
+	subscribers *HashMap[string, *channelGroupState[T]]
 	wg          sync.WaitGroup
 }
 
@@ -1295,7 +1273,7 @@ type channelGroupState[T any] struct {
 func NewChannelGroup[T any](ctx context.Context) *ChannelGroup[T] {
 	return &ChannelGroup[T]{
 		ctx:         NewMultiContext(ctx),
-		subscribers: NewHashMap[*channelGroupState[T]](),
+		subscribers: NewHashMap[string, *channelGroupState[T]](),
 		wg:          sync.WaitGroup{},
 	}
 }
@@ -1408,11 +1386,11 @@ func (m *MultiContext) Cancel() {
 
 // Borrower is a thread-safe object that can be borrowed and returned.
 type Borrower[T any] struct {
-	v      *T
+	v      atomic.Pointer[T]
 	ch     chan *T
 	closed *bool
-	mu     sync.Mutex
 	once   sync.Once
+	mu     sync.Mutex
 }
 
 // NewBorrower returns a new Borrower with the provided value.
@@ -1420,10 +1398,11 @@ func NewBorrower[T any](value T) *Borrower[T] {
 	closed := false
 	b := &Borrower[T]{
 		ch:     make(chan *T, 1),
-		v:      &value,
+		v:      atomic.Pointer[T]{},
 		closed: &closed,
 	}
-	b.ch <- b.v
+	b.v.Store(&value)
+	b.ch <- b.v.Load()
 	return b
 }
 
@@ -1464,24 +1443,22 @@ func (b *Borrower[T]) BorrowContext(ctx context.Context) (*T, error) {
 // If the value is not a pointer to the value that was borrowed, it will return an error.
 // If the value has already been returned, it will return an error.
 func (b *Borrower[T]) Return(obj *T) error {
-	if b.v != obj {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.v.Load() != obj {
 		return fmt.Errorf("object returned to borrower is not the same as the object that was borrowed")
 	}
 	if len(b.ch) > 0 {
 		return fmt.Errorf("object already returned to borrower")
 	}
-	b.mu.Lock()
-	*b.v = *obj
-	b.mu.Unlock()
+	b.v.Store(obj)
 	b.ch <- obj
 	return nil
 }
 
 // Value returns the value of the Borrower. This is a non-blocking operation since the value is not borrowed(non-pointer).
 func (b *Borrower[T]) Value() T {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return *b.v
+	return *b.v.Load()
 }
 
 // Do borrows the value, calls the provided function, and returns the value.
@@ -1489,6 +1466,16 @@ func (b *Borrower[T]) Do(fn func(*T)) error {
 	value := b.Borrow()
 	fn(value)
 	return b.Return(value)
+}
+
+// Swap borrows the value, swaps it with the provided value, and returns the value to the Borrower.
+func (b *Borrower[T]) Swap(value T) error {
+	_, ok := b.TryBorrow()
+	if !ok {
+		return fmt.Errorf("borrower closed")
+	}
+	b.v.Swap(&value)
+	return b.Return(&value)
 }
 
 // Close closes the Borrower and prevents it from being borrowed again. If the Borrower is still borrowed, it will return an error.
@@ -1499,13 +1486,13 @@ func (b *Borrower[T]) Close() error {
 		b.mu.Lock()
 		defer b.mu.Unlock()
 		if len(b.ch) > 0 {
-			err = fmt.Errorf("%T is still borrowed", b.v)
+			err = fmt.Errorf("value is still borrowed")
 			return
 		}
 		if !*b.closed {
 			close(b.ch)
 			*b.closed = true
-			b.v = nil
+			b.v = atomic.Pointer[T]{}
 		}
 	})
 	return err
