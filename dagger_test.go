@@ -54,7 +54,7 @@ func TestGraph(t *testing.T) {
 		edge, err := node1.SetEdge(node2, "connected", map[string]string{})
 		assert.Nil(t, err)
 		assert.NotNil(t, edge)
-		edge, ok := graph.GetEdge(edge.ID)
+		edge, ok := graph.GetEdge(edge.ID())
 		assert.True(t, ok)
 		assert.NotNil(t, edge)
 	})
@@ -67,19 +67,19 @@ func TestGraph(t *testing.T) {
 		assert.Nil(t, err)
 		assert.NotNil(t, edge)
 		node1.EdgesFrom("", func(e *dagger.GraphEdge[string]) bool {
-			assert.Equal(t, e.ID, edge.ID)
+			assert.Equal(t, e.ID(), edge.ID())
 			return true
 		})
 		node1.EdgesTo("", func(e *dagger.GraphEdge[string]) bool {
-			assert.NotEqual(t, e.ID, edge.ID)
+			assert.NotEqual(t, e.ID(), edge.ID())
 			return true
 		})
 		node2.EdgesTo("", func(e *dagger.GraphEdge[string]) bool {
-			assert.Equal(t, e.ID, edge.ID)
+			assert.Equal(t, e.ID(), edge.ID())
 			return true
 		})
 		node2.EdgesFrom("", func(e *dagger.GraphEdge[string]) bool {
-			assert.NotEqual(t, e.ID, edge.ID)
+			assert.NotEqual(t, e.ID(), edge.ID())
 			return true
 		})
 	})
@@ -94,7 +94,7 @@ func TestGraph(t *testing.T) {
 		assert.NoError(t, node1.Remove())
 		_, ok := graph.GetNode(node1.ID())
 		assert.False(t, ok)
-		_, ok = graph.GetEdge(edge.ID)
+		_, ok = graph.GetEdge(edge.ID())
 		assert.False(t, ok)
 	})
 	t.Run("remove edge", func(t *testing.T) {
@@ -105,8 +105,8 @@ func TestGraph(t *testing.T) {
 		edge, err := node1.SetEdge(node2, "connected", map[string]string{})
 		assert.Nil(t, err)
 		assert.NotNil(t, edge)
-		node1.RemoveEdge(edge.ID)
-		_, ok := graph.GetEdge(edge.ID)
+		node1.RemoveEdge(edge.ID())
+		_, ok := graph.GetEdge(edge.ID())
 		assert.False(t, ok)
 
 	})
@@ -367,24 +367,20 @@ func TestNewChannelGroup(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		ch := g.Channel(ctx)
 		wg.Add(1)
-		go func(i int) {
+		go func(i int, ch <-chan string) {
 			defer wg.Done()
 			for value := range ch {
 				assert.NotNil(t, value)
-				t.Logf("(%v) value: %v", i, value)
 				atomic.AddInt64(&count, 1)
 			}
-			t.Logf("(%v) channel closed", i)
-		}(i)
+		}(i, ch)
 	}
 	assert.Equal(t, g.Len(), 100)
 	for i := 0; i < 100; i++ {
 		g.Send(ctx, fmt.Sprintf("node-%d", i))
 	}
 	time.Sleep(1 * time.Second)
-	t.Logf("sent values")
 	g.Close()
-	t.Logf("closed group")
 	wg.Wait()
 	assert.Equal(t, g.Len(), 0)
 	assert.Equal(t, count, int64(10000))
@@ -408,4 +404,6 @@ func TestBorrower(t *testing.T) {
 	}))
 	value = b.Borrow()
 	assert.EqualValues(t, "testing2", *value)
+	assert.EqualValues(t, "testing2", b.Value())
+	assert.NoError(t, b.Close())
 }
