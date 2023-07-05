@@ -1378,6 +1378,79 @@ func (m *MultiContext) Cancel() {
 	m.cancel()
 }
 
+// Borrower is a thread-safe object that can be borrowed and returned.
+type Borrower[T any] struct {
+	v      *T
+	ch     chan *T
+	closed *bool
+}
+
+// NewBorrower returns a new Borrower with the provided value.
+func NewBorrower[T any](value T) *Borrower[T] {
+	closed := false
+	b := &Borrower[T]{
+		ch:     make(chan *T, 1),
+		v:      &value,
+		closed: &closed,
+	}
+	b.ch <- b.v
+	return b
+}
+
+// Borrow returns the value of the Borrower. If the value is not available, it will block until it is.
+func (b *Borrower[T]) Borrow() *T {
+	return <-b.ch
+}
+
+// TryBorrow returns the value of the Borrower if it is available. If the value is not available, it will return false.
+func (b *Borrower[T]) TryBorrow() (*T, bool) {
+	select {
+	case value, ok := <-b.ch:
+		if !ok {
+			return nil, false
+		}
+		return value, true
+	default:
+		return nil, false
+	}
+}
+
+// BorrowContext returns the value of the Borrower. If the value is not available, it will block until it is or the context is canceled.
+func (b *Borrower[T]) BorrowContext(ctx context.Context) (*T, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	select {
+	case value, ok := <-b.ch:
+		if !ok {
+			return nil, fmt.Errorf("borrower closed")
+		}
+		return value, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// Return returns the value to the Borrower so it can be borrowed again.
+// If the value is not a pointer to the value that was borrowed, it will return an error.
+// If the value has already been returned, it will return an error.
+func (b *Borrower[T]) Return(obj *T) error {
+	if b.v != obj {
+		return fmt.Errorf("object returned to borrower is not the same as the object that was borrowed")
+	}
+	if len(b.ch) > 0 {
+		return fmt.Errorf("object already returned to borrower")
+	}
+	b.ch <- obj
+	return nil
+}
+
+// Do borrows the value, calls the provided function, and returns the value.
+func (b *Borrower[T]) Do(fn func(*T)) error {
+	value := b.Borrow()
+	fn(value)
+	return b.Return(value)
+}
+
 // debugF logs a message if the DAGGER_DEBUG environment variable is set.
 // It adds a stacktrace to the log message.
 func debugF(format string, a ...interface{}) {

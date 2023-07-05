@@ -389,3 +389,23 @@ func TestNewChannelGroup(t *testing.T) {
 	assert.Equal(t, g.Len(), 0)
 	assert.Equal(t, count, int64(10000))
 }
+
+func TestBorrower(t *testing.T) {
+	b := dagger.NewBorrower[string]("testing")
+	value := b.Borrow()
+	assert.EqualValues(t, "testing", *value)
+	assert.NoError(t, b.Return(value))
+	assert.Error(t, b.Return(value))
+	value = b.Borrow()
+	assert.EqualValues(t, "testing", *value)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	_, err := b.BorrowContext(ctx)
+	assert.Error(t, err)
+	assert.NoError(t, b.Return(value))
+	assert.NoError(t, b.Do(func(value *string) {
+		*value = "testing2"
+	}))
+	value = b.Borrow()
+	assert.EqualValues(t, "testing2", *value)
+}
