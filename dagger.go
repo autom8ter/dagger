@@ -772,14 +772,35 @@ func (n *HashMap[T]) Set(key string, value T) {
 
 // Range ranges over the map with a function until false is returned
 func (n *HashMap[T]) Range(f func(id string, node T) bool) {
-	n.mu.RLock()
-	data := n.data
-	n.mu.RUnlock()
-	for k, v := range data {
+	for _, k := range n.Keys() {
+		v, _ := n.Get(k)
 		if !f(k, v) {
 			return
 		}
 	}
+}
+
+// Filter returns a new hashmap with the values that return true from the function
+func (n *HashMap[T]) Filter(f func(id string, node T) bool) *HashMap[T] {
+	filtered := NewHashMap[T]()
+	for _, k := range n.Keys() {
+		v, _ := n.Get(k)
+		if f(k, v) {
+			filtered.Set(k, v)
+		}
+	}
+	return filtered
+}
+
+// Map returns a copy of the hashmap as a map[string]T
+func (n *HashMap[T]) Map() map[string]T {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	copied := map[string]T{}
+	for k, v := range n.data {
+		copied[k] = v
+	}
+	return copied
 }
 
 // Delete deletes the key from the map
@@ -1270,7 +1291,7 @@ func (b *ChannelGroup[T]) Send(ctx context.Context, val T) {
 		b.subscribers.Range(func(key string, state channelGroupState[T]) bool {
 			select {
 			case <-state.ctx.Done():
-				return false
+				return true
 			case state.ch <- val:
 				return true
 			}
@@ -1349,6 +1370,8 @@ func (m *MultiContext) WithContext(ctx context.Context) context.Context {
 
 // Cancel cancels all child contexts.
 func (m *MultiContext) Cancel() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, cancel := range m.cancels {
 		cancel()
 	}
