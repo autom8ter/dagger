@@ -420,9 +420,13 @@ func TestNewChannelGroup(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		ch := g.Channel(ctx)
 		wg.Add(1)
-		go func(i int, ch <-chan string) {
+		go func(i int, ch *dagger.Channel[string]) {
 			defer wg.Done()
-			for value := range ch {
+			for {
+				value, ok := ch.Recv(ctx)
+				if !ok {
+					return
+				}
 				assert.NotNil(t, value)
 				atomic.AddInt64(&count, 1)
 			}

@@ -51,12 +51,23 @@ Borrower: thread safe object ownership manager
   - [func \(q \*BoundedQueue\[T\]\) Push\(val T\)](<#BoundedQueue[T].Push>)
   - [func \(q \*BoundedQueue\[T\]\) Range\(fn func\(element T\) bool\)](<#BoundedQueue[T].Range>)
   - [func \(q \*BoundedQueue\[T\]\) RangeUntil\(fn func\(element T\) bool, done chan struct\{\}\)](<#BoundedQueue[T].RangeUntil>)
+- [type Channel](<#Channel>)
+  - [func NewChannel\[T any\]\(ctx context.Context, opts ...ChannelOpt\[T\]\) \*Channel\[T\]](<#NewChannel>)
+  - [func \(c \*Channel\[T\]\) Close\(\)](<#Channel[T].Close>)
+  - [func \(c \*Channel\[T\]\) Context\(\) \*MultiContext](<#Channel[T].Context>)
+  - [func \(c \*Channel\[T\]\) Recv\(ctx context.Context\) \(T, bool\)](<#Channel[T].Recv>)
+  - [func \(c \*Channel\[T\]\) Send\(ctx context.Context, value T\) bool](<#Channel[T].Send>)
 - [type ChannelGroup](<#ChannelGroup>)
   - [func NewChannelGroup\[T any\]\(ctx context.Context\) \*ChannelGroup\[T\]](<#NewChannelGroup>)
   - [func \(b \*ChannelGroup\[T\]\) Channel\(ctx context.Context\) \<\-chan T](<#ChannelGroup[T].Channel>)
   - [func \(b \*ChannelGroup\[T\]\) Close\(\)](<#ChannelGroup[T].Close>)
   - [func \(c \*ChannelGroup\[T\]\) Len\(\) int](<#ChannelGroup[T].Len>)
   - [func \(b \*ChannelGroup\[T\]\) Send\(ctx context.Context, val T\)](<#ChannelGroup[T].Send>)
+- [type ChannelOpt](<#ChannelOpt>)
+  - [func WithBufferSize\[T any\]\(bufferSize int\) ChannelOpt\[T\]](<#WithBufferSize>)
+  - [func WithOnRcv\[T any\]\(fn func\(context.Context, T\) T\) ChannelOpt\[T\]](<#WithOnRcv>)
+  - [func WithOnSend\[T any\]\(fn func\(context.Context, T\) T\) ChannelOpt\[T\]](<#WithOnSend>)
+  - [func WithWhere\[T any\]\(fn func\(context.Context, T\) bool\) ChannelOpt\[T\]](<#WithWhere>)
 - [type DAG](<#DAG>)
   - [func NewDAG\[T Node\]\(opts ...DagOpt\) \(\*DAG\[T\], error\)](<#NewDAG>)
   - [func \(g \*DAG\[T\]\) Acyclic\(\) bool](<#DAG[T].Acyclic>)
@@ -112,6 +123,7 @@ Borrower: thread safe object ownership manager
 - [type MultiContext](<#MultiContext>)
   - [func NewMultiContext\(ctx context.Context\) \*MultiContext](<#NewMultiContext>)
   - [func \(m \*MultiContext\) Cancel\(\)](<#MultiContext.Cancel>)
+  - [func \(m \*MultiContext\) WithCloser\(fn func\(\)\)](<#MultiContext.WithCloser>)
   - [func \(m \*MultiContext\) WithContext\(ctx context.Context\) context.Context](<#MultiContext.WithContext>)
 - [type Node](<#Node>)
 - [type PriorityQueue](<#PriorityQueue>)
@@ -161,7 +173,7 @@ func UniqueID(prefix string) string
 UniqueID returns a unique identifier with the given prefix
 
 <a name="Borrower"></a>
-## type [Borrower](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1388-L1394>)
+## type [Borrower](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1393-L1399>)
 
 Borrower is a thread\-safe object that can be borrowed and returned.
 
@@ -172,7 +184,7 @@ type Borrower[T any] struct {
 ```
 
 <a name="NewBorrower"></a>
-### func [NewBorrower](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1397>)
+### func [NewBorrower](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1402>)
 
 ```go
 func NewBorrower[T any](value T) *Borrower[T]
@@ -181,7 +193,7 @@ func NewBorrower[T any](value T) *Borrower[T]
 NewBorrower returns a new Borrower with the provided value.
 
 <a name="Borrower[T].Borrow"></a>
-### func \(\*Borrower\[T\]\) [Borrow](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1410>)
+### func \(\*Borrower\[T\]\) [Borrow](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1415>)
 
 ```go
 func (b *Borrower[T]) Borrow() *T
@@ -190,7 +202,7 @@ func (b *Borrower[T]) Borrow() *T
 Borrow returns the value of the Borrower. If the value is not available, it will block until it is.
 
 <a name="Borrower[T].BorrowContext"></a>
-### func \(\*Borrower\[T\]\) [BorrowContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1428>)
+### func \(\*Borrower\[T\]\) [BorrowContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1433>)
 
 ```go
 func (b *Borrower[T]) BorrowContext(ctx context.Context) (*T, error)
@@ -199,7 +211,7 @@ func (b *Borrower[T]) BorrowContext(ctx context.Context) (*T, error)
 BorrowContext returns the value of the Borrower. If the value is not available, it will block until it is or the context is canceled.
 
 <a name="Borrower[T].Close"></a>
-### func \(\*Borrower\[T\]\) [Close](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1483>)
+### func \(\*Borrower\[T\]\) [Close](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1488>)
 
 ```go
 func (b *Borrower[T]) Close() error
@@ -208,7 +220,7 @@ func (b *Borrower[T]) Close() error
 Close closes the Borrower and prevents it from being borrowed again. If the Borrower is still borrowed, it will return an error. Close is idempotent.
 
 <a name="Borrower[T].Do"></a>
-### func \(\*Borrower\[T\]\) [Do](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1465>)
+### func \(\*Borrower\[T\]\) [Do](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1470>)
 
 ```go
 func (b *Borrower[T]) Do(fn func(*T)) error
@@ -217,7 +229,7 @@ func (b *Borrower[T]) Do(fn func(*T)) error
 Do borrows the value, calls the provided function, and returns the value.
 
 <a name="Borrower[T].Return"></a>
-### func \(\*Borrower\[T\]\) [Return](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1445>)
+### func \(\*Borrower\[T\]\) [Return](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1450>)
 
 ```go
 func (b *Borrower[T]) Return(obj *T) error
@@ -226,7 +238,7 @@ func (b *Borrower[T]) Return(obj *T) error
 Return returns the value to the Borrower so it can be borrowed again. If the value is not a pointer to the value that was borrowed, it will return an error. If the value has already been returned, it will return an error.
 
 <a name="Borrower[T].Swap"></a>
-### func \(\*Borrower\[T\]\) [Swap](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1472>)
+### func \(\*Borrower\[T\]\) [Swap](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1477>)
 
 ```go
 func (b *Borrower[T]) Swap(value T) error
@@ -235,7 +247,7 @@ func (b *Borrower[T]) Swap(value T) error
 Swap borrows the value, swaps it with the provided value, and returns the value to the Borrower.
 
 <a name="Borrower[T].TryBorrow"></a>
-### func \(\*Borrower\[T\]\) [TryBorrow](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1415>)
+### func \(\*Borrower\[T\]\) [TryBorrow](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1420>)
 
 ```go
 func (b *Borrower[T]) TryBorrow() (*T, bool)
@@ -244,7 +256,7 @@ func (b *Borrower[T]) TryBorrow() (*T, bool)
 TryBorrow returns the value of the Borrower if it is available. If the value is not available, it will return false.
 
 <a name="Borrower[T].Value"></a>
-### func \(\*Borrower\[T\]\) [Value](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1460>)
+### func \(\*Borrower\[T\]\) [Value](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1465>)
 
 ```go
 func (b *Borrower[T]) Value() T
@@ -326,6 +338,62 @@ func (q *BoundedQueue[T]) RangeUntil(fn func(element T) bool, done chan struct{}
 
 RangeUntil executes a provided function once for each BoundedQueue element until it returns false or a value is sent to the done channel. Use this function when you want to continuously process items from the queue until a done signal is received.
 
+<a name="Channel"></a>
+## type [Channel](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1516-L1524>)
+
+Channel is a safer version of a channel that can be closed and has a context to prevent sending or receiving when the context is canceled.
+
+```go
+type Channel[T any] struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewChannel"></a>
+### func [NewChannel](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1565>)
+
+```go
+func NewChannel[T any](ctx context.Context, opts ...ChannelOpt[T]) *Channel[T]
+```
+
+NewChannel returns a new Channel.
+
+<a name="Channel[T].Close"></a>
+### func \(\*Channel\[T\]\) [Close](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1631>)
+
+```go
+func (c *Channel[T]) Close()
+```
+
+Close closes the channel. It is idempotent.
+
+<a name="Channel[T].Context"></a>
+### func \(\*Channel\[T\]\) [Context](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1583>)
+
+```go
+func (c *Channel[T]) Context() *MultiContext
+```
+
+Context returns the context of the channel.
+
+<a name="Channel[T].Recv"></a>
+### func \(\*Channel\[T\]\) [Recv](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1606>)
+
+```go
+func (c *Channel[T]) Recv(ctx context.Context) (T, bool)
+```
+
+Recv returns the next value from the channel. If the channel is closed, it will return false.
+
+<a name="Channel[T].Send"></a>
+### func \(\*Channel\[T\]\) [Send](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1589>)
+
+```go
+func (c *Channel[T]) Send(ctx context.Context, value T) bool
+```
+
+Send sends a value to the channel. If the channel is closed, it will return immediately and return false. If the context is canceled, it will return immediately and return false.
+
 <a name="ChannelGroup"></a>
 ## type [ChannelGroup](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1259-L1263>)
 
@@ -381,6 +449,51 @@ func (b *ChannelGroup[T]) Send(ctx context.Context, val T)
 ```
 
 Send sends a value to all channels in the group.
+
+<a name="ChannelOpt"></a>
+## type [ChannelOpt](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1534>)
+
+ChannelOpt is an option for creating a new Channel.
+
+```go
+type ChannelOpt[T any] func(*channelOpts[T])
+```
+
+<a name="WithBufferSize"></a>
+### func [WithBufferSize](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1537>)
+
+```go
+func WithBufferSize[T any](bufferSize int) ChannelOpt[T]
+```
+
+WithBufferSize sets the buffer size of the channel.
+
+<a name="WithOnRcv"></a>
+### func [WithOnRcv](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1551>)
+
+```go
+func WithOnRcv[T any](fn func(context.Context, T) T) ChannelOpt[T]
+```
+
+WithOnRcv adds a function to be called before receiving a value.
+
+<a name="WithOnSend"></a>
+### func [WithOnSend](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1544>)
+
+```go
+func WithOnSend[T any](fn func(context.Context, T) T) ChannelOpt[T]
+```
+
+WithOnSend adds a function to be called before sending a value.
+
+<a name="WithWhere"></a>
+### func [WithWhere](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1558>)
+
+```go
+func WithWhere[T any](fn func(context.Context, T) bool) ChannelOpt[T]
+```
+
+WithWhere adds a function to be called before sending a value to determine if the value should be sent.
 
 <a name="DAG"></a>
 ## type [DAG](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L322-L329>)
@@ -881,7 +994,7 @@ func NewMultiContext(ctx context.Context) *MultiContext
 NewMultiContext returns a new MultiContext.
 
 <a name="MultiContext.Cancel"></a>
-### func \(\*MultiContext\) [Cancel](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1378>)
+### func \(\*MultiContext\) [Cancel](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1383>)
 
 ```go
 func (m *MultiContext) Cancel()
@@ -889,8 +1002,17 @@ func (m *MultiContext) Cancel()
 
 Cancel cancels all child contexts.
 
+<a name="MultiContext.WithCloser"></a>
+### func \(\*MultiContext\) [WithCloser](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1368>)
+
+```go
+func (m *MultiContext) WithCloser(fn func())
+```
+
+WithCloser adds a function to be called when the multi context is cancelled.
+
 <a name="MultiContext.WithContext"></a>
-### func \(\*MultiContext\) [WithContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1369>)
+### func \(\*MultiContext\) [WithContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1374>)
 
 ```go
 func (m *MultiContext) WithContext(ctx context.Context) context.Context

@@ -40,6 +40,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/goccy/go-graphviz"
 	"github.com/goccy/go-graphviz/cgraph"
@@ -487,9 +488,9 @@ func (g *DAG[T]) BFS(ctx context.Context, reverse bool, start *GraphNode[T], sea
 // The reverse parameter determines whether the search is reversed or not.
 // The fn parameter is a function that is called on each node in the graph. If the function returns false, the search is stopped.
 func (g *DAG[T]) DFS(ctx context.Context, reverse bool, start *GraphNode[T], fn GraphSearchFunc[T]) error {
+	ctx, cancel := context.WithCancel(ctx)
 	var visited = NewSet[string]()
 	queue := NewBoundedQueue[*searchItem[T]](0)
-	var done = make(chan struct{}, 1)
 	egp1, ctx := errgroup.WithContext(ctx)
 	egp1.Go(func() error {
 		egp2, ctx := errgroup.WithContext(ctx)
@@ -507,16 +508,16 @@ func (g *DAG[T]) DFS(ctx context.Context, reverse bool, start *GraphNode[T], fn 
 		if err := egp2.Wait(); err != nil {
 			return err
 		}
-		done <- struct{}{}
+		cancel()
 		return nil
 	})
 	egp1.Go(func() error {
-		queue.RangeUntil(func(element *searchItem[T]) bool {
+		queue.RangeContext(ctx, func(element *searchItem[T]) bool {
 			if element.node.ID() != start.ID() {
 				return fn(ctx, element.relationship, element.node)
 			}
 			return true
-		}, done)
+		})
 		return nil
 	})
 	if err := egp1.Wait(); err != nil {
@@ -921,76 +922,75 @@ func (q *PriorityQueue[T]) Peek() (T, bool) {
 // BoundedQueue is a basic FIFO BoundedQueue based on a buffered channel
 type BoundedQueue[T any] struct {
 	closeOnce sync.Once
-	ch        chan T
+	ch        *Channel[T]
 }
 
 // NewBoundedQueue returns a new BoundedQueue with the given max size. When the max size is reached, the queue will block until a value is removed.
 // If maxSize is 0, the queue will always block until a value is removed. The BoundedQueue is concurrent-safe.
 func NewBoundedQueue[T any](maxSize int) *BoundedQueue[T] {
-	vals := make(chan T, maxSize)
-	return &BoundedQueue[T]{ch: vals}
+	return &BoundedQueue[T]{ch: NewChannel[T](context.Background(), WithBufferSize[T](maxSize))}
 }
 
 // Range executes a provided function once for each BoundedQueue element until it returns false.
 func (q *BoundedQueue[T]) Range(fn func(element T) bool) {
 	for {
-		select {
-		case r, ok := <-q.ch:
-			if !ok {
-				return
-			}
-			if !fn(r) {
-				return
-			}
-		default:
-			if len(q.ch) == 0 {
-				return
-			}
+		value, ok := q.ch.Recv(context.Background())
+		if !ok {
+			return
+		}
+		if !fn(value) {
+			return
 		}
 	}
 }
 
-// RangeUntil executes a provided function once for each BoundedQueue element until it returns false or a value is sent to the done channel.
+// RangeContext executes a provided function once for each BoundedQueue element until it returns false or a value is sent to the done channel.
 // Use this function when you want to continuously process items from the queue until a done signal is received.
-func (q *BoundedQueue[T]) RangeUntil(fn func(element T) bool, done chan struct{}) {
+func (q *BoundedQueue[T]) RangeContext(ctx context.Context, fn func(element T) bool) {
 	for {
-		select {
-		case <-done:
+		value, ok := q.ch.Recv(ctx)
+		if !ok {
 			return
-		case r, ok := <-q.ch:
-			if !ok {
-				return
-			}
-			if !fn(r) {
-				return
-			}
+		}
+		if !fn(value) {
+			return
 		}
 	}
 }
 
 // Close closes the BoundedQueue channel.
 func (q *BoundedQueue[T]) Close() {
-	q.closeOnce.Do(func() {
-		close(q.ch)
-	})
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	q.ch.Close(ctx)
 }
 
-// Push adds an element to the end of the BoundedQueue.
-func (q *BoundedQueue[T]) Push(val T) {
-	q.ch <- val
+// Push adds an element to the end of the BoundedQueue and returns a channel that will block until the element is added.
+// If the queue is full, it will block until an element is removed.
+func (q *BoundedQueue[T]) Push(val T) chan bool {
+	return q.ch.SendAsync(context.Background(), val)
+}
+
+// PushContext adds an element to the end of the BoundedQueue and returns a channel that will block until the element is added.
+// If the queue is full, it will block until an element is removed or the context is cancelled.
+func (q *BoundedQueue[T]) PushContext(ctx context.Context, val T) chan bool {
+	return q.ch.SendAsync(ctx, val)
 }
 
 // Pop removes and returns an element from the beginning of the BoundedQueue.
 func (q *BoundedQueue[T]) Pop() (T, bool) {
-	select {
-	case r, ok := <-q.ch:
-		return r, ok
-	}
+	return q.ch.Recv(context.Background())
+}
+
+// PopContext removes and returns an element from the beginning of the BoundedQueue.
+// If no element is available, it will block until an element is available or the context is cancelled.
+func (q *BoundedQueue[T]) PopContext(ctx context.Context) (T, bool) {
+	return q.ch.Recv(ctx)
 }
 
 // Len returns the number of elements in the BoundedQueue.
 func (q *BoundedQueue[T]) Len() int {
-	return len(q.ch)
+	return q.ch.Len()
 }
 
 // Queue is a thread safe non-blocking queue
@@ -1258,14 +1258,8 @@ func (s *Set[T]) Sort(lessFunc func(i T, j T) bool) []T {
 // ChannelGroup is a thread-safe group of channels. It is useful for broadcasting a value to multiple channels at once.
 type ChannelGroup[T any] struct {
 	ctx         *MultiContext
-	subscribers *HashMap[string, *channelGroupState[T]]
+	subscribers *HashMap[string, *Channel[T]]
 	wg          sync.WaitGroup
-}
-
-type channelGroupState[T any] struct {
-	ch  chan T
-	ctx context.Context
-	mu  sync.Mutex
 }
 
 // NewChannelGroup returns a new ChannelGroup. The context is used to cancel all subscribers when the context is canceled.
@@ -1273,55 +1267,29 @@ type channelGroupState[T any] struct {
 func NewChannelGroup[T any](ctx context.Context) *ChannelGroup[T] {
 	return &ChannelGroup[T]{
 		ctx:         NewMultiContext(ctx),
-		subscribers: NewHashMap[string, *channelGroupState[T]](),
+		subscribers: NewHashMap[string, *Channel[T]](),
 		wg:          sync.WaitGroup{},
 	}
 }
 
 // Send sends a value to all channels in the group.
 func (b *ChannelGroup[T]) Send(ctx context.Context, val T) {
-	b.wg.Add(1)
-	go func() {
-		defer b.wg.Done()
-		ctx, cancel := context.WithCancel(b.ctx.WithContext(ctx))
-		defer cancel()
-		b.subscribers.Range(func(key string, state *channelGroupState[T]) bool {
-			state.mu.Lock()
-			defer state.mu.Unlock()
-			select {
-			case <-ctx.Done():
-				return false
-			case <-state.ctx.Done():
-				return true
-			case state.ch <- val:
-				return true
-			}
-		})
-	}()
+	b.subscribers.Range(func(key string, state *Channel[T]) bool {
+		state.Send(ctx, val)
+		return true
+	})
 	return
 }
 
 // Channel returns a channel that will receive values from broadcasted values. The channel will be closed when the context is canceled.
 // This is a non-blocking operation.
-func (b *ChannelGroup[T]) Channel(ctx context.Context) <-chan T {
-	ch := make(chan T, 1)
+func (b *ChannelGroup[T]) Channel(ctx context.Context, opts ...ChannelOpt[T]) *Channel[T] {
 	id := UniqueID("subscriber")
-	state := &channelGroupState[T]{
-		ch:  ch,
-		ctx: b.ctx.WithContext(ctx),
-	}
-	b.subscribers.Set(id, state)
-	b.wg.Add(1)
-	go func() {
-		defer b.wg.Done()
-		ctx, cancel := context.WithCancel(b.ctx.WithContext(ctx))
-		defer cancel()
-		<-ctx.Done()
-		state.mu.Lock()
-		defer state.mu.Unlock()
+	opts = append(opts, WithOnClose[T](func(ctx context.Context) {
 		b.subscribers.Delete(id)
-		close(ch)
-	}()
+	}))
+	ch := NewChannel(ctx, opts...)
+	b.subscribers.Set(id, ch)
 	return ch
 }
 
@@ -1362,6 +1330,11 @@ func NewMultiContext(ctx context.Context) *MultiContext {
 		}
 	}()
 	return m
+}
+
+// WithCloser adds a function to be called when the multi context is cancelled.
+func (m *MultiContext) WithCloser(fn func()) {
+	m.cancels = append(m.cancels, fn)
 }
 
 // WithContext returns a new context that is a child of the root context.
@@ -1505,4 +1478,260 @@ func debugF(format string, a ...interface{}) {
 		format = fmt.Sprintf("DEBUG: %s\n", format)
 		log.Printf(format, a...)
 	}
+}
+
+// Channel is a safer version of a channel that can be closed and has a context to prevent sending or receiving when the context is canceled.
+type Channel[T any] struct {
+	ctx       *MultiContext
+	ch        chan T
+	closed    *int64
+	closeOnce sync.Once
+	wg        sync.WaitGroup
+	onSend    []func(context.Context, T) T
+	onRcv     []func(context.Context, T) T
+	onClose   []func(context.Context)
+	where     []func(context.Context, T) bool
+}
+
+type channelOpts[T any] struct {
+	bufferSize int
+	onSend     []func(context.Context, T) T
+	onRcv      []func(context.Context, T) T
+	onClose    []func(context.Context)
+	where      []func(context.Context, T) bool
+}
+
+// ChannelOpt is an option for creating a new Channel.
+type ChannelOpt[T any] func(*channelOpts[T])
+
+// WithBufferSize sets the buffer size of the channel.
+func WithBufferSize[T any](bufferSize int) ChannelOpt[T] {
+	return func(opts *channelOpts[T]) {
+		opts.bufferSize = bufferSize
+	}
+}
+
+// WithOnSend adds a function to be called before sending a value.
+func WithOnSend[T any](fn func(context.Context, T) T) ChannelOpt[T] {
+	return func(opts *channelOpts[T]) {
+		opts.onSend = append(opts.onSend, fn)
+	}
+}
+
+// WithOnRcv adds a function to be called before receiving a value.
+func WithOnRcv[T any](fn func(context.Context, T) T) ChannelOpt[T] {
+	return func(opts *channelOpts[T]) {
+		opts.onRcv = append(opts.onRcv, fn)
+	}
+}
+
+// WithWhere adds a function to be called before sending a value to determine if the value should be sent.
+func WithWhere[T any](fn func(context.Context, T) bool) ChannelOpt[T] {
+	return func(opts *channelOpts[T]) {
+		opts.where = append(opts.where, fn)
+	}
+}
+
+// WithOnClose adds a function to be called before the channel is closed.
+func WithOnClose[T any](fn func(ctx context.Context)) ChannelOpt[T] {
+	return func(opts *channelOpts[T]) {
+		opts.onClose = append(opts.onClose, fn)
+	}
+}
+
+// NewChannel returns a new Channel with the provided options.
+// The channel will be closed when the context is cancelled.
+func NewChannel[T any](ctx context.Context, opts ...ChannelOpt[T]) *Channel[T] {
+	closed := int64(0)
+	var options = &channelOpts[T]{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	c := &Channel[T]{
+		ctx:       NewMultiContext(ctx),
+		ch:        make(chan T, options.bufferSize),
+		closed:    &closed,
+		closeOnce: sync.Once{},
+		onSend:    options.onSend,
+		onRcv:     options.onRcv,
+		onClose:   options.onClose,
+		where:     options.where,
+	}
+	go func() {
+		ctx, cancel := context.WithCancel(c.ctx)
+		defer cancel()
+		<-ctx.Done()
+		ctx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		c.Close(ctx)
+	}()
+	return c
+}
+
+// Context returns the context of the channel.
+func (c *Channel[T]) Context() *MultiContext {
+	return c.ctx
+}
+
+// SendAsync sends a value to the channel in a goroutine. If the channel is closed, it will return false to the channel returned by this function.
+// If the context is canceled, it will return false to the channel returned by this function.
+// If the value is sent, it will return true to the channel returned by this function.
+// This is a non-blocking call.
+func (c *Channel[T]) SendAsync(ctx context.Context, value T) chan bool {
+	ch := make(chan bool, 1)
+	c.wg.Add(1)
+	go func(value T) {
+		defer c.wg.Done()
+		if atomic.LoadInt64(c.closed) > 0 {
+			ch <- false
+			return
+		}
+		ctx = c.ctx.WithContext(ctx)
+		for _, fn := range c.onSend {
+			value = fn(ctx, value)
+		}
+		select {
+		case c.ch <- value:
+			ch <- true
+		case <-ctx.Done():
+			ch <- false
+		}
+	}(value)
+	return ch
+}
+
+// Send sends a value to the channel. If the channel is closed or the context is cancelled, it will return false.
+// If the value is sent, it will return true.
+// This is a blocking call.
+func (c *Channel[T]) Send(ctx context.Context, value T) bool {
+	if atomic.LoadInt64(c.closed) > 0 {
+		return false
+	}
+	ctx = c.ctx.WithContext(ctx)
+	for _, fn := range c.onSend {
+		value = fn(ctx, value)
+	}
+	select {
+	case c.ch <- value:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// Recv returns the next value from the channel. If the channel is closed, it will return false.
+func (c *Channel[T]) Recv(ctx context.Context) (T, bool) {
+	if atomic.LoadInt64(c.closed) > 0 {
+		return *new(T), false
+	}
+	ctx = c.ctx.WithContext(ctx)
+	select {
+	case value, ok := <-c.ch:
+		if !ok {
+			return *new(T), false
+		}
+		for _, fn := range c.onRcv {
+			value = fn(ctx, value)
+		}
+		for _, fn := range c.where {
+			if !fn(ctx, value) {
+				return *new(T), false
+			}
+		}
+		return value, true
+	case <-ctx.Done():
+		return *new(T), false
+	}
+}
+
+// ProxyFrom proxies values from the given channel to this channel.
+// This is a non-blocking call.
+func (c *Channel[T]) ProxyFrom(ctx context.Context, ch *Channel[T]) {
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		for {
+			value, ok := ch.Recv(ctx)
+			if !ok {
+				return
+			}
+			c.Send(ctx, value)
+		}
+	}()
+}
+
+// ProxyTo proxies values from this channel to the given channel.
+// This is a non-blocking call.
+func (c *Channel[T]) ProxyTo(ctx context.Context, ch *Channel[T]) {
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		for {
+			value, ok := c.Recv(ctx)
+			if !ok {
+				return
+			}
+			ch.Send(ctx, value)
+		}
+	}()
+}
+
+// Len returns the number of values in the channel.
+func (c *Channel[T]) Len() int {
+	return len(c.ch)
+}
+
+// ForEach calls the given function for each value in the channel until the channel is closed, the context is cancelled, or the function returns false.
+func (c *Channel[T]) ForEach(ctx context.Context, fn func(context.Context, T) bool) {
+	for {
+		value, ok := c.Recv(ctx)
+		if !ok {
+			return
+		}
+		if !fn(ctx, value) {
+			return
+		}
+	}
+}
+
+// ForEachAsync calls the given function for each value in the channel until the channel is closed, the context is cancelled, or the function returns false.
+// It will call the function in a new goroutine for each value.
+func (c *Channel[T]) ForEachAsync(ctx context.Context, fn func(context.Context, T) bool) {
+	for {
+		value, ok := c.Recv(ctx)
+		if !ok {
+			return
+		}
+		c.wg.Add(1)
+		go func(value T) {
+			defer c.wg.Done()
+			if !fn(ctx, value) {
+				return
+			}
+		}(value)
+	}
+}
+
+// Close closes the channel. It will call the OnClose functions and wait for all goroutines to finish.
+// If the context is cancelled, waiting for goroutines to finish will be cancelled.
+func (c *Channel[T]) Close(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	c.closeOnce.Do(func() {
+		done := make(chan struct{}, 1)
+		c.ctx.Cancel()
+		atomic.StoreInt64(c.closed, 1)
+		go func() {
+			c.wg.Wait()
+			done <- struct{}{}
+		}()
+		select {
+		case <-done:
+		case <-ctx.Done():
+		}
+		for _, fn := range c.onClose {
+			fn(c.ctx)
+		}
+		close(c.ch)
+	})
 }
