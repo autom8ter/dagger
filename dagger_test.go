@@ -417,30 +417,43 @@ func TestNewChannelGroup(t *testing.T) {
 	g := dagger.NewChannelGroup[string](ctx)
 	wg := sync.WaitGroup{}
 	count := int64(0)
+	mu := sync.Mutex{}
+	var received = map[string]bool{}
+	var duplicateErr error
 	for i := 0; i < 100; i++ {
-		ch := g.Channel(ctx)
 		wg.Add(1)
-		go func(i int, ch *dagger.Channel[string]) {
+		ch := g.Channel(ctx)
+		go func(i int, ch *dagger.ChannelReceiver[string]) {
 			defer wg.Done()
-			for {
+			for duplicateErr == nil {
 				value, ok := ch.Recv(ctx)
 				if !ok {
 					return
 				}
+				mu.Lock()
+				if _, ok := received[fmt.Sprintf("%v-%v", i, value)]; ok {
+					duplicateErr = fmt.Errorf("duplicate value %v", value)
+					mu.Unlock()
+					return
+				}
 				assert.NotNil(t, value)
 				atomic.AddInt64(&count, 1)
+				received[fmt.Sprintf("%v-%v", i, value)] = true
+				mu.Unlock()
 			}
 		}(i, ch)
 	}
+
 	assert.Equal(t, g.Len(), 100)
 	for i := 0; i < 100; i++ {
-		g.Send(ctx, fmt.Sprintf("node-%d", i))
+		<-g.SendAsync(ctx, fmt.Sprintf("node-%d", i))
 	}
 	time.Sleep(1 * time.Second)
 	g.Close()
+	assert.NoError(t, duplicateErr)
 	wg.Wait()
-	assert.Equal(t, g.Len(), 0)
-	assert.Equal(t, count, int64(10000))
+	assert.Equal(t, 0, g.Len())
+	assert.Equal(t, int64(10000), count)
 }
 
 func TestBorrower(t *testing.T) {
