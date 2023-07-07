@@ -1,3 +1,5 @@
+github.com/autom8ter/async v1.0.1 h1:Wr/hEgyq0u1KxaQgnMxZykHDhLy/ot+/1T1U6uI9ir8=
+github.com/autom8ter/async v1.0.1/go.mod h1:b0XDjGNFJp+Af0/En4A8CTZxKHe4m/YS43eSd/p1kh0=
 github.com/corona10/goimagehash v1.0.2 h1:pUfB0LnsJASMPGEZLj7tGY251vF+qLGqOgEP4rUs6kA=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

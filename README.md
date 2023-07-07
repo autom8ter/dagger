@@ -33,41 +33,16 @@ Borrower: thread safe object ownership manager
 ## Index
 
 - [func UniqueID\(prefix string\) string](<#UniqueID>)
-- [type Borrower](<#Borrower>)
-  - [func NewBorrower\[T any\]\(value T\) \*Borrower\[T\]](<#NewBorrower>)
-  - [func \(b \*Borrower\[T\]\) Borrow\(\) \*T](<#Borrower[T].Borrow>)
-  - [func \(b \*Borrower\[T\]\) BorrowContext\(ctx context.Context\) \(\*T, error\)](<#Borrower[T].BorrowContext>)
-  - [func \(b \*Borrower\[T\]\) Close\(\) error](<#Borrower[T].Close>)
-  - [func \(b \*Borrower\[T\]\) Do\(fn func\(\*T\)\) error](<#Borrower[T].Do>)
-  - [func \(b \*Borrower\[T\]\) Return\(obj \*T\) error](<#Borrower[T].Return>)
-  - [func \(b \*Borrower\[T\]\) Swap\(value T\) error](<#Borrower[T].Swap>)
-  - [func \(b \*Borrower\[T\]\) TryBorrow\(\) \(\*T, bool\)](<#Borrower[T].TryBorrow>)
-  - [func \(b \*Borrower\[T\]\) Value\(\) T](<#Borrower[T].Value>)
 - [type BoundedQueue](<#BoundedQueue>)
   - [func NewBoundedQueue\[T any\]\(maxSize int\) \*BoundedQueue\[T\]](<#NewBoundedQueue>)
   - [func \(q \*BoundedQueue\[T\]\) Close\(\)](<#BoundedQueue[T].Close>)
   - [func \(q \*BoundedQueue\[T\]\) Len\(\) int](<#BoundedQueue[T].Len>)
   - [func \(q \*BoundedQueue\[T\]\) Pop\(\) \(T, bool\)](<#BoundedQueue[T].Pop>)
-  - [func \(q \*BoundedQueue\[T\]\) Push\(val T\)](<#BoundedQueue[T].Push>)
+  - [func \(q \*BoundedQueue\[T\]\) PopContext\(ctx context.Context\) \(T, bool\)](<#BoundedQueue[T].PopContext>)
+  - [func \(q \*BoundedQueue\[T\]\) Push\(val T\) bool](<#BoundedQueue[T].Push>)
+  - [func \(q \*BoundedQueue\[T\]\) PushContext\(ctx context.Context, val T\) bool](<#BoundedQueue[T].PushContext>)
   - [func \(q \*BoundedQueue\[T\]\) Range\(fn func\(element T\) bool\)](<#BoundedQueue[T].Range>)
-  - [func \(q \*BoundedQueue\[T\]\) RangeUntil\(fn func\(element T\) bool, done chan struct\{\}\)](<#BoundedQueue[T].RangeUntil>)
-- [type Channel](<#Channel>)
-  - [func NewChannel\[T any\]\(ctx context.Context, opts ...ChannelOpt\[T\]\) \*Channel\[T\]](<#NewChannel>)
-  - [func \(c \*Channel\[T\]\) Close\(\)](<#Channel[T].Close>)
-  - [func \(c \*Channel\[T\]\) Context\(\) \*MultiContext](<#Channel[T].Context>)
-  - [func \(c \*Channel\[T\]\) Recv\(ctx context.Context\) \(T, bool\)](<#Channel[T].Recv>)
-  - [func \(c \*Channel\[T\]\) Send\(ctx context.Context, value T\) bool](<#Channel[T].Send>)
-- [type ChannelGroup](<#ChannelGroup>)
-  - [func NewChannelGroup\[T any\]\(ctx context.Context\) \*ChannelGroup\[T\]](<#NewChannelGroup>)
-  - [func \(b \*ChannelGroup\[T\]\) Channel\(ctx context.Context\) \<\-chan T](<#ChannelGroup[T].Channel>)
-  - [func \(b \*ChannelGroup\[T\]\) Close\(\)](<#ChannelGroup[T].Close>)
-  - [func \(c \*ChannelGroup\[T\]\) Len\(\) int](<#ChannelGroup[T].Len>)
-  - [func \(b \*ChannelGroup\[T\]\) Send\(ctx context.Context, val T\)](<#ChannelGroup[T].Send>)
-- [type ChannelOpt](<#ChannelOpt>)
-  - [func WithBufferSize\[T any\]\(bufferSize int\) ChannelOpt\[T\]](<#WithBufferSize>)
-  - [func WithOnRcv\[T any\]\(fn func\(context.Context, T\) T\) ChannelOpt\[T\]](<#WithOnRcv>)
-  - [func WithOnSend\[T any\]\(fn func\(context.Context, T\) T\) ChannelOpt\[T\]](<#WithOnSend>)
-  - [func WithWhere\[T any\]\(fn func\(context.Context, T\) bool\) ChannelOpt\[T\]](<#WithWhere>)
+  - [func \(q \*BoundedQueue\[T\]\) RangeContext\(ctx context.Context, fn func\(element T\) bool\)](<#BoundedQueue[T].RangeContext>)
 - [type DAG](<#DAG>)
   - [func NewDAG\[T Node\]\(opts ...DagOpt\) \(\*DAG\[T\], error\)](<#NewDAG>)
   - [func \(g \*DAG\[T\]\) Acyclic\(\) bool](<#DAG[T].Acyclic>)
@@ -120,11 +95,6 @@ Borrower: thread safe object ownership manager
   - [func \(n \*HashMap\[K, V\]\) Range\(f func\(key K, value V\) bool\)](<#HashMap[K, V].Range>)
   - [func \(n \*HashMap\[K, V\]\) Set\(key K, value V\)](<#HashMap[K, V].Set>)
   - [func \(n \*HashMap\[K, V\]\) Values\(\) \[\]V](<#HashMap[K, V].Values>)
-- [type MultiContext](<#MultiContext>)
-  - [func NewMultiContext\(ctx context.Context\) \*MultiContext](<#NewMultiContext>)
-  - [func \(m \*MultiContext\) Cancel\(\)](<#MultiContext.Cancel>)
-  - [func \(m \*MultiContext\) WithCloser\(fn func\(\)\)](<#MultiContext.WithCloser>)
-  - [func \(m \*MultiContext\) WithContext\(ctx context.Context\) context.Context](<#MultiContext.WithContext>)
 - [type Node](<#Node>)
 - [type PriorityQueue](<#PriorityQueue>)
   - [func NewPriorityQueue\[T any\]\(\) \*PriorityQueue\[T\]](<#NewPriorityQueue>)
@@ -172,98 +142,6 @@ func UniqueID(prefix string) string
 
 UniqueID returns a unique identifier with the given prefix
 
-<a name="Borrower"></a>
-## type [Borrower](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1393-L1399>)
-
-Borrower is a thread\-safe object that can be borrowed and returned.
-
-```go
-type Borrower[T any] struct {
-    // contains filtered or unexported fields
-}
-```
-
-<a name="NewBorrower"></a>
-### func [NewBorrower](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1402>)
-
-```go
-func NewBorrower[T any](value T) *Borrower[T]
-```
-
-NewBorrower returns a new Borrower with the provided value.
-
-<a name="Borrower[T].Borrow"></a>
-### func \(\*Borrower\[T\]\) [Borrow](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1415>)
-
-```go
-func (b *Borrower[T]) Borrow() *T
-```
-
-Borrow returns the value of the Borrower. If the value is not available, it will block until it is.
-
-<a name="Borrower[T].BorrowContext"></a>
-### func \(\*Borrower\[T\]\) [BorrowContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1433>)
-
-```go
-func (b *Borrower[T]) BorrowContext(ctx context.Context) (*T, error)
-```
-
-BorrowContext returns the value of the Borrower. If the value is not available, it will block until it is or the context is canceled.
-
-<a name="Borrower[T].Close"></a>
-### func \(\*Borrower\[T\]\) [Close](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1488>)
-
-```go
-func (b *Borrower[T]) Close() error
-```
-
-Close closes the Borrower and prevents it from being borrowed again. If the Borrower is still borrowed, it will return an error. Close is idempotent.
-
-<a name="Borrower[T].Do"></a>
-### func \(\*Borrower\[T\]\) [Do](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1470>)
-
-```go
-func (b *Borrower[T]) Do(fn func(*T)) error
-```
-
-Do borrows the value, calls the provided function, and returns the value.
-
-<a name="Borrower[T].Return"></a>
-### func \(\*Borrower\[T\]\) [Return](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1450>)
-
-```go
-func (b *Borrower[T]) Return(obj *T) error
-```
-
-Return returns the value to the Borrower so it can be borrowed again. If the value is not a pointer to the value that was borrowed, it will return an error. If the value has already been returned, it will return an error.
-
-<a name="Borrower[T].Swap"></a>
-### func \(\*Borrower\[T\]\) [Swap](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1477>)
-
-```go
-func (b *Borrower[T]) Swap(value T) error
-```
-
-Swap borrows the value, swaps it with the provided value, and returns the value to the Borrower.
-
-<a name="Borrower[T].TryBorrow"></a>
-### func \(\*Borrower\[T\]\) [TryBorrow](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1420>)
-
-```go
-func (b *Borrower[T]) TryBorrow() (*T, bool)
-```
-
-TryBorrow returns the value of the Borrower if it is available. If the value is not available, it will return false.
-
-<a name="Borrower[T].Value"></a>
-### func \(\*Borrower\[T\]\) [Value](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1465>)
-
-```go
-func (b *Borrower[T]) Value() T
-```
-
-Value returns the value of the Borrower. This is a non\-blocking operation since the value is not borrowed\(non\-pointer\).
-
 <a name="BoundedQueue"></a>
 ## type [BoundedQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L922-L925>)
 
@@ -285,7 +163,7 @@ func NewBoundedQueue[T any](maxSize int) *BoundedQueue[T]
 NewBoundedQueue returns a new BoundedQueue with the given max size. When the max size is reached, the queue will block until a value is removed. If maxSize is 0, the queue will always block until a value is removed. The BoundedQueue is concurrent\-safe.
 
 <a name="BoundedQueue[T].Close"></a>
-### func \(\*BoundedQueue\[T\]\) [Close](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L972>)
+### func \(\*BoundedQueue\[T\]\) [Close](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L961>)
 
 ```go
 func (q *BoundedQueue[T]) Close()
@@ -294,7 +172,7 @@ func (q *BoundedQueue[T]) Close()
 Close closes the BoundedQueue channel.
 
 <a name="BoundedQueue[T].Len"></a>
-### func \(\*BoundedQueue\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L992>)
+### func \(\*BoundedQueue\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L991>)
 
 ```go
 func (q *BoundedQueue[T]) Len() int
@@ -303,7 +181,7 @@ func (q *BoundedQueue[T]) Len() int
 Len returns the number of elements in the BoundedQueue.
 
 <a name="BoundedQueue[T].Pop"></a>
-### func \(\*BoundedQueue\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L984>)
+### func \(\*BoundedQueue\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L980>)
 
 ```go
 func (q *BoundedQueue[T]) Pop() (T, bool)
@@ -311,17 +189,35 @@ func (q *BoundedQueue[T]) Pop() (T, bool)
 
 Pop removes and returns an element from the beginning of the BoundedQueue.
 
-<a name="BoundedQueue[T].Push"></a>
-### func \(\*BoundedQueue\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L979>)
+<a name="BoundedQueue[T].PopContext"></a>
+### func \(\*BoundedQueue\[T\]\) [PopContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L986>)
 
 ```go
-func (q *BoundedQueue[T]) Push(val T)
+func (q *BoundedQueue[T]) PopContext(ctx context.Context) (T, bool)
 ```
 
-Push adds an element to the end of the BoundedQueue.
+PopContext removes and returns an element from the beginning of the BoundedQueue. If no element is available, it will block until an element is available or the context is cancelled.
+
+<a name="BoundedQueue[T].Push"></a>
+### func \(\*BoundedQueue\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L969>)
+
+```go
+func (q *BoundedQueue[T]) Push(val T) bool
+```
+
+Push adds an element to the end of the BoundedQueue and returns a channel that will block until the element is added. If the queue is full, it will block until an element is removed.
+
+<a name="BoundedQueue[T].PushContext"></a>
+### func \(\*BoundedQueue\[T\]\) [PushContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L975>)
+
+```go
+func (q *BoundedQueue[T]) PushContext(ctx context.Context, val T) bool
+```
+
+PushContext adds an element to the end of the BoundedQueue and returns a channel that will block until the element is added. If the queue is full, it will block until an element is removed or the context is cancelled.
 
 <a name="BoundedQueue[T].Range"></a>
-### func \(\*BoundedQueue\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L935>)
+### func \(\*BoundedQueue\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L934>)
 
 ```go
 func (q *BoundedQueue[T]) Range(fn func(element T) bool)
@@ -329,171 +225,14 @@ func (q *BoundedQueue[T]) Range(fn func(element T) bool)
 
 Range executes a provided function once for each BoundedQueue element until it returns false.
 
-<a name="BoundedQueue[T].RangeUntil"></a>
-### func \(\*BoundedQueue\[T\]\) [RangeUntil](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L955>)
+<a name="BoundedQueue[T].RangeContext"></a>
+### func \(\*BoundedQueue\[T\]\) [RangeContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L948>)
 
 ```go
-func (q *BoundedQueue[T]) RangeUntil(fn func(element T) bool, done chan struct{})
+func (q *BoundedQueue[T]) RangeContext(ctx context.Context, fn func(element T) bool)
 ```
 
-RangeUntil executes a provided function once for each BoundedQueue element until it returns false or a value is sent to the done channel. Use this function when you want to continuously process items from the queue until a done signal is received.
-
-<a name="Channel"></a>
-## type [Channel](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1516-L1524>)
-
-Channel is a safer version of a channel that can be closed and has a context to prevent sending or receiving when the context is canceled.
-
-```go
-type Channel[T any] struct {
-    // contains filtered or unexported fields
-}
-```
-
-<a name="NewChannel"></a>
-### func [NewChannel](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1565>)
-
-```go
-func NewChannel[T any](ctx context.Context, opts ...ChannelOpt[T]) *Channel[T]
-```
-
-NewChannel returns a new Channel.
-
-<a name="Channel[T].Close"></a>
-### func \(\*Channel\[T\]\) [Close](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1631>)
-
-```go
-func (c *Channel[T]) Close()
-```
-
-Close closes the channel. It is idempotent.
-
-<a name="Channel[T].Context"></a>
-### func \(\*Channel\[T\]\) [Context](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1583>)
-
-```go
-func (c *Channel[T]) Context() *MultiContext
-```
-
-Context returns the context of the channel.
-
-<a name="Channel[T].Recv"></a>
-### func \(\*Channel\[T\]\) [Recv](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1606>)
-
-```go
-func (c *Channel[T]) Recv(ctx context.Context) (T, bool)
-```
-
-Recv returns the next value from the channel. If the channel is closed, it will return false.
-
-<a name="Channel[T].Send"></a>
-### func \(\*Channel\[T\]\) [Send](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1589>)
-
-```go
-func (c *Channel[T]) Send(ctx context.Context, value T) bool
-```
-
-Send sends a value to the channel. If the channel is closed, it will return immediately and return false. If the context is canceled, it will return immediately and return false.
-
-<a name="ChannelGroup"></a>
-## type [ChannelGroup](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1259-L1263>)
-
-ChannelGroup is a thread\-safe group of channels. It is useful for broadcasting a value to multiple channels at once.
-
-```go
-type ChannelGroup[T any] struct {
-    // contains filtered or unexported fields
-}
-```
-
-<a name="NewChannelGroup"></a>
-### func [NewChannelGroup](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1273>)
-
-```go
-func NewChannelGroup[T any](ctx context.Context) *ChannelGroup[T]
-```
-
-NewChannelGroup returns a new ChannelGroup. The context is used to cancel all subscribers when the context is canceled. A channel group is useful for broadcasting a value to multiple subscribers.
-
-<a name="ChannelGroup[T].Channel"></a>
-### func \(\*ChannelGroup\[T\]\) [Channel](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1306>)
-
-```go
-func (b *ChannelGroup[T]) Channel(ctx context.Context) <-chan T
-```
-
-Channel returns a channel that will receive values from broadcasted values. The channel will be closed when the context is canceled. This is a non\-blocking operation.
-
-<a name="ChannelGroup[T].Close"></a>
-### func \(\*ChannelGroup\[T\]\) [Close](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1334>)
-
-```go
-func (b *ChannelGroup[T]) Close()
-```
-
-Close blocks until all subscribers have been removed and then closes the broadcast.
-
-<a name="ChannelGroup[T].Len"></a>
-### func \(\*ChannelGroup\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1329>)
-
-```go
-func (c *ChannelGroup[T]) Len() int
-```
-
-Len returns the number of subscribers.
-
-<a name="ChannelGroup[T].Send"></a>
-### func \(\*ChannelGroup\[T\]\) [Send](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1282>)
-
-```go
-func (b *ChannelGroup[T]) Send(ctx context.Context, val T)
-```
-
-Send sends a value to all channels in the group.
-
-<a name="ChannelOpt"></a>
-## type [ChannelOpt](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1534>)
-
-ChannelOpt is an option for creating a new Channel.
-
-```go
-type ChannelOpt[T any] func(*channelOpts[T])
-```
-
-<a name="WithBufferSize"></a>
-### func [WithBufferSize](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1537>)
-
-```go
-func WithBufferSize[T any](bufferSize int) ChannelOpt[T]
-```
-
-WithBufferSize sets the buffer size of the channel.
-
-<a name="WithOnRcv"></a>
-### func [WithOnRcv](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1551>)
-
-```go
-func WithOnRcv[T any](fn func(context.Context, T) T) ChannelOpt[T]
-```
-
-WithOnRcv adds a function to be called before receiving a value.
-
-<a name="WithOnSend"></a>
-### func [WithOnSend](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1544>)
-
-```go
-func WithOnSend[T any](fn func(context.Context, T) T) ChannelOpt[T]
-```
-
-WithOnSend adds a function to be called before sending a value.
-
-<a name="WithWhere"></a>
-### func [WithWhere](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1558>)
-
-```go
-func WithWhere[T any](fn func(context.Context, T) bool) ChannelOpt[T]
-```
-
-WithWhere adds a function to be called before sending a value to determine if the value should be sent.
+RangeContext executes a provided function once for each BoundedQueue element until it returns false or a value is sent to the done channel. Use this function when you want to continuously process items from the queue until a done signal is received.
 
 <a name="DAG"></a>
 ## type [DAG](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L322-L329>)
@@ -972,54 +711,6 @@ func (n *HashMap[K, V]) Values() []V
 
 Values returns a copy of the values in the map as a slice
 
-<a name="MultiContext"></a>
-## type [MultiContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1340-L1345>)
-
-MultiContext is a context that can be used to combine contexts with a root context so they can be cancelled together.
-
-```go
-type MultiContext struct {
-    context.Context
-    // contains filtered or unexported fields
-}
-```
-
-<a name="NewMultiContext"></a>
-### func [NewMultiContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1348>)
-
-```go
-func NewMultiContext(ctx context.Context) *MultiContext
-```
-
-NewMultiContext returns a new MultiContext.
-
-<a name="MultiContext.Cancel"></a>
-### func \(\*MultiContext\) [Cancel](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1383>)
-
-```go
-func (m *MultiContext) Cancel()
-```
-
-Cancel cancels all child contexts.
-
-<a name="MultiContext.WithCloser"></a>
-### func \(\*MultiContext\) [WithCloser](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1368>)
-
-```go
-func (m *MultiContext) WithCloser(fn func())
-```
-
-WithCloser adds a function to be called when the multi context is cancelled.
-
-<a name="MultiContext.WithContext"></a>
-### func \(\*MultiContext\) [WithContext](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1374>)
-
-```go
-func (m *MultiContext) WithContext(ctx context.Context) context.Context
-```
-
-WithContext returns a new context that is a child of the root context. This context will be cancelled when the multi context is cancelled.
-
 <a name="Node"></a>
 ## type [Node](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L110-L117>)
 
@@ -1102,7 +793,7 @@ func (q *PriorityQueue[T]) UpdatePriority(value T, priority float64)
 
 
 <a name="Queue"></a>
-## type [Queue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L997-L1000>)
+## type [Queue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L996-L999>)
 
 Queue is a thread safe non\-blocking queue
 
@@ -1113,7 +804,7 @@ type Queue[T any] struct {
 ```
 
 <a name="NewQueue"></a>
-### func [NewQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1003>)
+### func [NewQueue](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1002>)
 
 ```go
 func NewQueue[T any]() *Queue[T]
@@ -1122,7 +813,7 @@ func NewQueue[T any]() *Queue[T]
 NewQueue returns a new Queue
 
 <a name="Queue[T].Len"></a>
-### func \(\*Queue\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1030>)
+### func \(\*Queue\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1029>)
 
 ```go
 func (s *Queue[T]) Len() int
@@ -1131,7 +822,7 @@ func (s *Queue[T]) Len() int
 Len returns the length of the queue
 
 <a name="Queue[T].Peek"></a>
-### func \(\*Queue\[T\]\) [Peek](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1037>)
+### func \(\*Queue\[T\]\) [Peek](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1036>)
 
 ```go
 func (s *Queue[T]) Peek() (T, bool)
@@ -1140,7 +831,7 @@ func (s *Queue[T]) Peek() (T, bool)
 Peek returns the next item in the queue without removing it
 
 <a name="Queue[T].Pop"></a>
-### func \(\*Queue\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1016>)
+### func \(\*Queue\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1015>)
 
 ```go
 func (s *Queue[T]) Pop() (T, bool)
@@ -1149,7 +840,7 @@ func (s *Queue[T]) Pop() (T, bool)
 Pop and return top element of Queue. Return false if Queue is empty.
 
 <a name="Queue[T].Push"></a>
-### func \(\*Queue\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1009>)
+### func \(\*Queue\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1008>)
 
 ```go
 func (s *Queue[T]) Push(f T)
@@ -1158,7 +849,7 @@ func (s *Queue[T]) Push(f T)
 Push a new value onto the Queue
 
 <a name="Queue[T].Range"></a>
-### func \(\*Queue\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1047>)
+### func \(\*Queue\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1046>)
 
 ```go
 func (q *Queue[T]) Range(fn func(element T) bool)
@@ -1167,7 +858,7 @@ func (q *Queue[T]) Range(fn func(element T) bool)
 Range executes a provided function once for each Queue element until it returns false or the Queue is empty.
 
 <a name="Queue[T].RangeUntil"></a>
-### func \(\*Queue\[T\]\) [RangeUntil](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1061>)
+### func \(\*Queue\[T\]\) [RangeUntil](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1060>)
 
 ```go
 func (q *Queue[T]) RangeUntil(fn func(element T) bool, done chan struct{})
@@ -1176,7 +867,7 @@ func (q *Queue[T]) RangeUntil(fn func(element T) bool, done chan struct{})
 RangeUntil executes a provided function once for each Queue element until it returns false or a value is sent on the done channel. Use this function when you want to continuously process items from the queue until a done signal is received.
 
 <a name="Set"></a>
-## type [Set](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1187-L1190>)
+## type [Set](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1186-L1189>)
 
 Set is a basic thread\-safe Set implementation.
 
@@ -1187,7 +878,7 @@ type Set[T comparable] struct {
 ```
 
 <a name="NewSet"></a>
-### func [NewSet](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1193>)
+### func [NewSet](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1192>)
 
 ```go
 func NewSet[T comparable]() *Set[T]
@@ -1196,7 +887,7 @@ func NewSet[T comparable]() *Set[T]
 NewSet returns a new Set with the given initial size.
 
 <a name="Set[T].Add"></a>
-### func \(\*Set\[T\]\) [Add](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1199>)
+### func \(\*Set\[T\]\) [Add](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1198>)
 
 ```go
 func (s *Set[T]) Add(val T)
@@ -1205,7 +896,7 @@ func (s *Set[T]) Add(val T)
 Add adds an element to the Set.
 
 <a name="Set[T].Contains"></a>
-### func \(\*Set\[T\]\) [Contains](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1213>)
+### func \(\*Set\[T\]\) [Contains](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1212>)
 
 ```go
 func (s *Set[T]) Contains(val T) bool
@@ -1214,7 +905,7 @@ func (s *Set[T]) Contains(val T) bool
 Contains returns true if the Set contains the element.
 
 <a name="Set[T].Len"></a>
-### func \(\*Set\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1232>)
+### func \(\*Set\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1231>)
 
 ```go
 func (s *Set[T]) Len() int
@@ -1223,7 +914,7 @@ func (s *Set[T]) Len() int
 Len returns the number of elements in the Set.
 
 <a name="Set[T].Range"></a>
-### func \(\*Set\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1221>)
+### func \(\*Set\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1220>)
 
 ```go
 func (s *Set[T]) Range(fn func(element T) bool)
@@ -1232,7 +923,7 @@ func (s *Set[T]) Range(fn func(element T) bool)
 Range executes a provided function once for each Set element until it returns false.
 
 <a name="Set[T].Remove"></a>
-### func \(\*Set\[T\]\) [Remove](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1206>)
+### func \(\*Set\[T\]\) [Remove](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1205>)
 
 ```go
 func (s *Set[T]) Remove(val T)
@@ -1241,7 +932,7 @@ func (s *Set[T]) Remove(val T)
 Remove removes an element from the Set.
 
 <a name="Set[T].Sort"></a>
-### func \(\*Set\[T\]\) [Sort](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1250>)
+### func \(\*Set\[T\]\) [Sort](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1249>)
 
 ```go
 func (s *Set[T]) Sort(lessFunc func(i T, j T) bool) []T
@@ -1250,7 +941,7 @@ func (s *Set[T]) Sort(lessFunc func(i T, j T) bool) []T
 Sort returns the values of the set as an array sorted by the provided less function
 
 <a name="Set[T].Values"></a>
-### func \(\*Set\[T\]\) [Values](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1239>)
+### func \(\*Set\[T\]\) [Values](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1238>)
 
 ```go
 func (s *Set[T]) Values() []T
@@ -1259,7 +950,7 @@ func (s *Set[T]) Values() []T
 Values returns the values of the set as an array
 
 <a name="Stack"></a>
-## type [Stack](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1085-L1088>)
+## type [Stack](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1084-L1087>)
 
 Stack is a basic LIFO Stack
 
@@ -1270,7 +961,7 @@ type Stack[T any] struct {
 ```
 
 <a name="NewStack"></a>
-### func [NewStack](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1079>)
+### func [NewStack](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1078>)
 
 ```go
 func NewStack[T any]() *Stack[T]
@@ -1279,7 +970,7 @@ func NewStack[T any]() *Stack[T]
 NewStack returns a new Stack instance
 
 <a name="Stack[T].Clear"></a>
-### func \(\*Stack\[T\]\) [Clear](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1131>)
+### func \(\*Stack\[T\]\) [Clear](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1130>)
 
 ```go
 func (s *Stack[T]) Clear()
@@ -1288,7 +979,7 @@ func (s *Stack[T]) Clear()
 Clear removes all elements from the Stack
 
 <a name="Stack[T].Len"></a>
-### func \(\*Stack\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1167>)
+### func \(\*Stack\[T\]\) [Len](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1166>)
 
 ```go
 func (s *Stack[T]) Len() int
@@ -1297,7 +988,7 @@ func (s *Stack[T]) Len() int
 Len returns the number of elements in the Stack.
 
 <a name="Stack[T].Peek"></a>
-### func \(\*Stack\[T\]\) [Peek](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1174>)
+### func \(\*Stack\[T\]\) [Peek](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1173>)
 
 ```go
 func (s *Stack[T]) Peek() (T, bool)
@@ -1306,7 +997,7 @@ func (s *Stack[T]) Peek() (T, bool)
 Peek returns the top element of the Stack without removing it. Return false if Stack is empty.
 
 <a name="Stack[T].Pop"></a>
-### func \(\*Stack\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1117>)
+### func \(\*Stack\[T\]\) [Pop](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1116>)
 
 ```go
 func (s *Stack[T]) Pop() (T, bool)
@@ -1315,7 +1006,7 @@ func (s *Stack[T]) Pop() (T, bool)
 Pop removes and return top element of Stack. Return false if Stack is empty.
 
 <a name="Stack[T].Push"></a>
-### func \(\*Stack\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1110>)
+### func \(\*Stack\[T\]\) [Push](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1109>)
 
 ```go
 func (s *Stack[T]) Push(f T)
@@ -1324,7 +1015,7 @@ func (s *Stack[T]) Push(f T)
 Push a new value onto the Stack \(LIFO\)
 
 <a name="Stack[T].Range"></a>
-### func \(\*Stack\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1138>)
+### func \(\*Stack\[T\]\) [Range](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1137>)
 
 ```go
 func (s *Stack[T]) Range(fn func(element T) bool)
@@ -1333,7 +1024,7 @@ func (s *Stack[T]) Range(fn func(element T) bool)
 Range executes a provided function once for each Stack element until it returns false.
 
 <a name="Stack[T].RangeUntil"></a>
-### func \(\*Stack\[T\]\) [RangeUntil](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1092>)
+### func \(\*Stack\[T\]\) [RangeUntil](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1091>)
 
 ```go
 func (s *Stack[T]) RangeUntil(fn func(element T) bool, done chan struct{})
@@ -1342,7 +1033,7 @@ func (s *Stack[T]) RangeUntil(fn func(element T) bool, done chan struct{})
 RangeUntil executes a provided function once after calling Pop on the stack until the function returns false or a value is sent on the done channel. Use this function when you want to continuously process items from the stack until a done signal is received.
 
 <a name="Stack[T].Sort"></a>
-### func \(\*Stack\[T\]\) [Sort](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1158>)
+### func \(\*Stack\[T\]\) [Sort](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1157>)
 
 ```go
 func (s *Stack[T]) Sort(lessFunc func(i T, j T) bool) []T
@@ -1351,7 +1042,7 @@ func (s *Stack[T]) Sort(lessFunc func(i T, j T) bool) []T
 Sort returns the values of the stack as an array sorted by the provided less function
 
 <a name="Stack[T].Values"></a>
-### func \(\*Stack\[T\]\) [Values](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1151>)
+### func \(\*Stack\[T\]\) [Values](<https://github.com/autom8ter/dagger/blob/main/dagger.go#L1150>)
 
 ```go
 func (s *Stack[T]) Values() []T

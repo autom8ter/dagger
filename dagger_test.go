@@ -6,8 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -409,71 +407,4 @@ func TestQueue(t *testing.T) {
 		assert.True(t, ok)
 	}
 	assert.Equal(t, q.Len(), 0)
-}
-
-func TestNewChannelGroup(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	g := dagger.NewChannelGroup[string](ctx)
-	wg := sync.WaitGroup{}
-	count := int64(0)
-	mu := sync.Mutex{}
-	var received = map[string]bool{}
-	var duplicateErr error
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		ch := g.Channel(ctx)
-		go func(i int, ch *dagger.ChannelReceiver[string]) {
-			defer wg.Done()
-			for duplicateErr == nil {
-				value, ok := ch.Recv(ctx)
-				if !ok {
-					return
-				}
-				mu.Lock()
-				if _, ok := received[fmt.Sprintf("%v-%v", i, value)]; ok {
-					duplicateErr = fmt.Errorf("duplicate value %v", value)
-					mu.Unlock()
-					return
-				}
-				assert.NotNil(t, value)
-				atomic.AddInt64(&count, 1)
-				received[fmt.Sprintf("%v-%v", i, value)] = true
-				mu.Unlock()
-			}
-		}(i, ch)
-	}
-
-	assert.Equal(t, g.Len(), 100)
-	for i := 0; i < 100; i++ {
-		<-g.SendAsync(ctx, fmt.Sprintf("node-%d", i))
-	}
-	time.Sleep(1 * time.Second)
-	g.Close()
-	assert.NoError(t, duplicateErr)
-	wg.Wait()
-	assert.Equal(t, 0, g.Len())
-	assert.Equal(t, int64(10000), count)
-}
-
-func TestBorrower(t *testing.T) {
-	b := dagger.NewBorrower[string]("testing")
-	value := b.Borrow()
-	assert.EqualValues(t, "testing", *value)
-	assert.NoError(t, b.Return(value))
-	assert.Error(t, b.Return(value))
-	value = b.Borrow()
-	assert.EqualValues(t, "testing", *value)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	_, err := b.BorrowContext(ctx)
-	assert.Error(t, err)
-	assert.NoError(t, b.Return(value))
-	assert.NoError(t, b.Do(func(value *string) {
-		*value = "testing2"
-	}))
-	value = b.Borrow()
-	assert.EqualValues(t, "testing2", *value)
-	assert.EqualValues(t, "testing2", b.Value())
-	assert.NoError(t, b.Close())
 }
